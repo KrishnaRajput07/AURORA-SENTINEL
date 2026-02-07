@@ -13,6 +13,7 @@ class RiskScoringEngine:
         # Risk weights (tunable)
         self.weights = {
             'aggressive_posture': 0.35, # Fighting stance, hands up
+            'aggressive_dynamics': 0.40, # Rapid movements, joint velocity
             'proximity_violation': 0.25, # People too close (fighting/stealing)
             'loitering': 0.20,           # Staying in one spot too long
             'unattended_object': 0.30,   # Bags left alone

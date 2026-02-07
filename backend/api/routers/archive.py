@@ -6,10 +6,15 @@ from datetime import datetime
 router = APIRouter()
 STORAGE_PATH = "storage/clips"
 BIN_PATH = "storage/bin"
+PROCESSED_PATH = "storage/processed"
 
 @router.get("/list")
 async def list_archives(source: str = "active"):
-    path = STORAGE_PATH if source == "active" else BIN_PATH
+    if source == "active": path = STORAGE_PATH
+    elif source == "bin": path = BIN_PATH
+    elif source == "processed": path = PROCESSED_PATH
+    else: path = STORAGE_PATH
+    
     if not os.path.exists(path):
         return {"clips": []}
     
@@ -32,7 +37,11 @@ async def list_archives(source: str = "active"):
 
 @router.get("/download/{filename}")
 async def download_clip(filename: str, source: str = "active"):
-    path = STORAGE_PATH if source == "active" else BIN_PATH
+    if source == "active": path = STORAGE_PATH
+    elif source == "bin": path = BIN_PATH
+    elif source == "processed": path = PROCESSED_PATH
+    else: path = STORAGE_PATH
+    
     file_path = os.path.join(path, filename)
     
     if not os.path.exists(file_path):
