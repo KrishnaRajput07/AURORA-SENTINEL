@@ -14,18 +14,16 @@ function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
-            <Router>
-                <Layout>
-                    <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/surveillance" element={<LiveSurveillance />} />
-                        <Route path="/demo" element={<DemoAnalysis />} />
-                        <Route path="/alerts" element={<AlertsPage />} />
-                        <Route path="/analytics" element={<AnalyticsPage />} />
-                        <Route path="/system" element={<SystemPage />} />
-                    </Routes>
-                </Layout>
-            </Router>
+            <Layout>
+                <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/surveillance" element={<LiveSurveillance />} />
+                    <Route path="/demo" element={<DemoAnalysis />} />
+                    <Route path="/alerts" element={<AlertsPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/system" element={<SystemPage />} />
+                </Routes>
+            </Layout>
         </ThemeProvider>
     );
 }

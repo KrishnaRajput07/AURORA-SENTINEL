@@ -1,175 +1,189 @@
 import React, { useState } from 'react';
-import { Box, AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItem, ListItemIcon, ListItemText, useTheme, useMediaQuery, Container } from '@mui/material';
-import { Menu, X, LayoutDashboard, AlertTriangle, Video, BarChart2, Settings, Shield, Scan } from 'lucide-react';
+import { Box, AppBar, Toolbar, Typography, IconButton, Container, Button, useTheme, Avatar, Tooltip, Drawer, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Menu, LayoutDashboard, Video, BarChart2, AlertCircle, Settings, ShieldCheck, Bell, ChevronDown, LogOut, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-const DRAWER_WIDTH = 260;
-
 const Layout = ({ children }) => {
     const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-    const [mobileOpen, setMobileOpen] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
-
-    const handleDrawerToggle = () => {
-        setMobileOpen(!mobileOpen);
-    };
+    const [mobileOpen, setMobileOpen] = useState(false);
 
     const menuItems = [
-        { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/' },
-        { text: 'Live Surveillance', icon: <Video size={20} />, path: '/surveillance' },
-        { text: 'AI Analysis', icon: <Scan size={20} />, path: '/demo' },
-        { text: 'Alerts', icon: <AlertTriangle size={20} />, path: '/alerts' },
-        { text: 'Analytics', icon: <BarChart2 size={20} />, path: '/analytics' },
-        { text: 'System', icon: <Settings size={20} />, path: '/system' },
+        { text: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/' },
+        { text: 'Surveillance', icon: <Video size={18} />, path: '/surveillance' },
+        { text: 'Intelligence', icon: <BarChart2 size={18} />, path: '/analytics' },
+        { text: 'Alerts', icon: <AlertCircle size={18} />, path: '/alerts' },
+        { text: 'System', icon: <Settings size={18} />, path: '/system' },
     ];
 
-    const drawerContent = (
-        <Box sx={{
-            height: '100%',
-            background: theme.palette.background.default, // Use theme background
-            borderRight: `1px solid ${theme.palette.divider}`,
-            backdropFilter: 'blur(10px)'
-        }}>
-            <Toolbar sx={{ display: 'flex', alignItems: 'center', px: 2, gap: 1.5 }}>
-                <Shield color={theme.palette.primary.main} size={28} />
-                <Box>
-                    <Typography variant="h6" sx={{ color: theme.palette.text.primary, lineHeight: 1, fontWeight: 700 }}>
-                        AURORA
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, letterSpacing: '0.15em', fontWeight: 600 }}>
-                        SENTINEL
-                    </Typography>
-                </Box>
-            </Toolbar>
-            <List sx={{ mt: 3, px: 2 }}>
-                {menuItems.map((item) => (
-                    <ListItem
-                        button
-                        key={item.text}
-                        onClick={() => {
-                            navigate(item.path);
-                            if (isMobile) setMobileOpen(false);
-                        }}
-                        sx={{
-                            mb: 0.5,
-                            borderRadius: '12px', // More rounded
-                            color: location.pathname === item.path ? theme.palette.primary.contrastText : theme.palette.text.secondary,
-                            backgroundColor: location.pathname === item.path ? theme.palette.primary.main : 'transparent',
-                            transition: 'all 0.2s ease-in-out',
-                            '&:hover': {
-                                backgroundColor: location.pathname === item.path ? theme.palette.primary.dark : theme.palette.action.hover,
-                                color: location.pathname === item.path ? theme.palette.primary.contrastText : theme.palette.text.primary,
-                                transform: 'translateX(3px)',
-                                '& .lucide': { color: location.pathname === item.path ? theme.palette.primary.contrastText : theme.palette.primary.main }
-                            }
-                        }}
-                    >
-                        <ListItemIcon sx={{ minWidth: 36, color: location.pathname === item.path ? 'inherit' : theme.palette.text.secondary }}>
-                            {item.icon}
-                        </ListItemIcon>
-                        <ListItemText
-                            primary={item.text}
-                            primaryTypographyProps={{
-                                sx: { fontWeight: 600, fontSize: '0.9rem' }
-                            }}
-                        />
-                    </ListItem>
-                ))}
-            </List>
-        </Box>
-    );
-
     return (
-        <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-            {/* Top Bar for Mobile */}
-            <AppBar
-                position="fixed"
-                sx={{
-                    width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-                    ml: { md: `${DRAWER_WIDTH}px` },
-                    display: { md: 'none' },
-                    background: theme.palette.background.paper,
-                    color: theme.palette.text.primary
-                }}
-            >
-                <Toolbar>
-                    <IconButton
-                        color="inherit"
-                        aria-label="open drawer"
-                        edge="start"
-                        onClick={handleDrawerToggle}
-                        sx={{ mr: 2, display: { md: 'none' } }}
-                    >
-                        <Menu />
-                    </IconButton>
-                    <Typography variant="h6" noWrap component="div" fontWeight={700}>
-                        AURORA SENTINEL
-                    </Typography>
-                </Toolbar>
+        <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
+
+            {/* --- Level 1: Brand & Utilities Header --- */}
+            <AppBar position="static" elevation={0} sx={{ bgcolor: '#FFFFFF', borderBottom: `1px solid ${theme.palette.divider}` }}>
+                <Container maxWidth="xl">
+                    <Toolbar disableGutters sx={{ height: 64 }}>
+
+                        {/* Mobile Menu Icon */}
+                        <IconButton
+                            color="inherit"
+                            edge="start"
+                            onClick={() => setMobileOpen(true)}
+                            sx={{ mr: 2, display: { md: 'none' }, color: theme.palette.text.secondary }}
+                        >
+                            <Menu />
+                        </IconButton>
+
+                        {/* Branding */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mr: 4 }}>
+                            <Box sx={{
+                                width: 36,
+                                height: 36,
+                                bgcolor: theme.palette.primary.main,
+                                borderRadius: '10px', // Slightly rounded brand logo
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: `0 4px 10px ${theme.palette.action.hover}`
+                            }}>
+                                <ShieldCheck color="#fff" size={20} />
+                            </Box>
+                            <Box>
+                                <Typography variant="h6" sx={{ lineHeight: 1, color: theme.palette.text.primary, letterSpacing: '-0.01em' }}>
+                                    AURORA<span style={{ fontWeight: 400, opacity: 0.8 }}>SENTINEL</span>
+                                </Typography>
+                            </Box>
+                        </Box>
+
+                        {/* Middle Spacer / Search Placeholder */}
+                        <Box sx={{ flexGrow: 1 }} />
+
+                        {/* Quick Actions */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Tooltip title="Search System">
+                                <IconButton size="small" sx={{ color: theme.palette.text.secondary }}>
+                                    <Search size={20} />
+                                </IconButton>
+                            </Tooltip>
+
+                            <Tooltip title="Notifications">
+                                <IconButton size="small" sx={{ color: theme.palette.text.secondary }}>
+                                    <Bell size={20} />
+                                </IconButton>
+                            </Tooltip>
+
+                            <Box sx={{ width: 1, height: 24, bgcolor: theme.palette.divider, mx: 1.5 }} />
+
+                            <Button
+                                color="inherit"
+                                startIcon={<Avatar sx={{ width: 28, height: 28, bgcolor: theme.palette.secondary.main, fontSize: '0.8rem' }}>OP</Avatar>}
+                                endIcon={<ChevronDown size={16} />}
+                                sx={{
+                                    textTransform: 'none',
+                                    color: theme.palette.text.primary,
+                                    fontWeight: 600
+                                }}
+                            >
+                                Operator
+                            </Button>
+                        </Box>
+                    </Toolbar>
+                </Container>
             </AppBar>
 
-            {/* Sidebar Navigation */}
-            <Box
-                component="nav"
-                sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
-            >
-                {/* Mobile Drawer */}
-                <Drawer
-                    variant="temporary"
-                    open={mobileOpen}
-                    onClose={handleDrawerToggle}
-                    ModalProps={{ keepMounted: true }}
-                    sx={{
-                        display: { xs: 'block', md: 'none' },
-                        '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH, border: 'none' },
-                    }}
-                >
-                    {drawerContent}
-                </Drawer>
-
-                {/* Desktop Drawer */}
-                <Drawer
-                    variant="permanent"
-                    sx={{
-                        display: { xs: 'none', md: 'block' },
-                        '& .MuiDrawer-paper': {
-                            boxSizing: 'border-box',
-                            width: DRAWER_WIDTH,
-                            border: 'none',
-                            bgcolor: 'transparent'
-                        },
-                    }}
-                    open
-                >
-                    {drawerContent}
-                </Drawer>
+            {/* --- Level 2: Centered Navigation Bar --- */}
+            <Box sx={{
+                bgcolor: '#FFFFFF',
+                borderBottom: `1px solid ${theme.palette.divider}`,
+                display: { xs: 'none', md: 'block' }
+            }}>
+                <Container maxWidth="xl">
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                        {menuItems.map((item) => {
+                            const isActive = location.pathname === item.path;
+                            return (
+                                <Box key={item.text} sx={{ position: 'relative', px: 1 }}>
+                                    <Button
+                                        onClick={() => navigate(item.path)}
+                                        startIcon={item.icon}
+                                        sx={{
+                                            py: 1.5,
+                                            px: 3,
+                                            borderRadius: '12px', // Rounded pill shape on hover
+                                            color: isActive ? theme.palette.primary.main : theme.palette.text.secondary,
+                                            fontWeight: isActive ? 700 : 500,
+                                            bgcolor: isActive ? 'rgba(111, 143, 114, 0.08)' : 'transparent',
+                                            '&:hover': {
+                                                bgcolor: 'rgba(111, 143, 114, 0.05)',
+                                                color: theme.palette.primary.main
+                                            }
+                                        }}
+                                    >
+                                        {item.text}
+                                    </Button>
+                                    {/* Active Indicator (Small dot instead of full underline for a cleaner look) 
+                                    {isActive && (
+                                        <motion.div
+                                            layoutId="nav-underline"
+                                            style={{
+                                                position: 'absolute',
+                                                bottom: 0,
+                                                left: '20%',
+                                                right: '20%',
+                                                height: 3,
+                                                backgroundColor: theme.palette.primary.main,
+                                                borderRadius: '3px 3px 0 0'
+                                            }}
+                                        />
+                                    )} */}
+                                </Box>
+                            )
+                        })}
+                    </Box>
+                </Container>
             </Box>
 
-            {/* Main Content Area */}
-            <Box
-                component="main"
+            {/* --- Mobile Drawer (Hidden on Desktop) --- */}
+            <Drawer
+                variant="temporary"
+                anchor="left"
+                open={mobileOpen}
+                onClose={() => setMobileOpen(false)}
                 sx={{
-                    flexGrow: 1,
-                    p: 3,
-                    width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-                    mt: { xs: 8, md: 0 },
-                    // Clean background without noisy gradients
-                    background: theme.palette.background.default,
+                    display: { xs: 'block', md: 'none' },
+                    '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 280 },
                 }}
             >
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.3 }}
-                    >
-                        {children}
-                    </motion.div>
-                </AnimatePresence>
+                <List>
+                    <Box sx={{ p: 2, mb: 1 }}>
+                        <Typography variant="h6" color="primary">Navigation</Typography>
+                    </Box>
+                    {menuItems.map((item) => (
+                        <ListItem button key={item.text} onClick={() => { navigate(item.path); setMobileOpen(false); }}>
+                            <ListItemIcon sx={{ color: theme.palette.primary.main }}>{item.icon}</ListItemIcon>
+                            <ListItemText primary={item.text} />
+                        </ListItem>
+                    ))}
+                </List>
+            </Drawer>
+
+            {/* --- Main Content Area --- */}
+            <Box component="main" sx={{ flexGrow: 1, py: 4 }}>
+                <Container maxWidth="xl">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={location.pathname}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            {children}
+                        </motion.div>
+                    </AnimatePresence>
+                </Container>
             </Box>
         </Box>
     );

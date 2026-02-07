@@ -1,11 +1,12 @@
 import React from 'react';
-import { MapContainer, TileLayer, Circle, Popup } from 'react-leaflet';
-import { Box, Typography } from '@mui/material';
+import { MapContainer, TileLayer, Circle, Popup, Marker } from 'react-leaflet';
+import { Box, Typography, useTheme, alpha } from '@mui/material';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+
+// Fix Leaflet icons
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-
 let DefaultIcon = L.icon({
     iconUrl: icon,
     shadowUrl: iconShadow,
@@ -15,6 +16,8 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 const RiskHeatmap = ({ alerts }) => {
+    const theme = useTheme();
+
     // Mock camera locations 
     const cameraLocations = [
         { id: 'CAM-001', lat: 28.5355, lng: 77.3910, name: 'Main Gate' },
@@ -33,20 +36,21 @@ const RiskHeatmap = ({ alerts }) => {
     };
 
     const getRiskColor = (risk) => {
-        if (risk > 75) return '#f43f5e'; // Rose 500 (High Risk)
-        if (risk > 50) return '#f97316'; // Orange 500 (Medium Risk)
-        if (risk > 25) return '#eab308'; // Yellow 500 (Low Risk)
-        return '#14b8a6'; // Teal 500 (Safe)
+        if (risk > 75) return theme.palette.error.main;
+        if (risk > 50) return theme.palette.warning.main;
+        if (risk > 25) return theme.palette.info.main;
+        return theme.palette.success.main;
     };
 
     return (
-        <Box sx={{ height: '100%', width: '100%', borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+        <Box sx={{ height: '100%', width: '100%', bgcolor: '#E8E2D8' }}>
             <MapContainer
                 center={[28.5355, 77.3910]}
                 zoom={16}
                 style={{ height: '100%', width: '100%' }}
+                zoomControl={false}
             >
-                {/* Clean Light Tiles for Premium Feel */}
+                {/* Light Mode Tiles - CartoDB Positron for Clean Look */}
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -54,29 +58,36 @@ const RiskHeatmap = ({ alerts }) => {
 
                 {cameraLocations.map((camera) => {
                     const risk = getCameraRisk(camera.id);
+                    const color = getRiskColor(risk);
+
                     return (
                         <Circle
                             key={camera.id}
                             center={[camera.lat, camera.lng]}
                             radius={40}
                             pathOptions={{
-                                fillColor: getRiskColor(risk),
-                                fillOpacity: 0.6, // Slightly higher opacity for visibility on light map
-                                color: getRiskColor(risk),
+                                fillColor: color,
+                                fillOpacity: 0.4, // Softer opacity
+                                color: color,
                                 weight: 2,
                             }}
                         >
-                            <Popup className="custom-popup">
-                                <Box sx={{ textAlign: 'center' }}>
-                                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#0f172a' }}>
+                            <Popup
+                                className="clean-popup"
+                                closeButton={false}
+                            >
+                                <Box sx={{ textAlign: 'center', p: 0.5 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                                         {camera.name}
                                     </Typography>
-                                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block' }}>
                                         ID: {camera.id}
                                     </Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: getRiskColor(risk), mt: 0.5 }}>
-                                        Risk Score: {risk.toFixed(1)}
-                                    </Typography>
+                                    <Box sx={{ mt: 1, borderTop: `1px solid ${theme.palette.divider}`, pt: 0.5 }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 'bold', color: color }}>
+                                            RISK: {risk.toFixed(1)}%
+                                        </Typography>
+                                    </Box>
                                 </Box>
                             </Popup>
                         </Circle>
