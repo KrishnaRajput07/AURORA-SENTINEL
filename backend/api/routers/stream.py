@@ -1,5 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.services.ml_service import ml_service
+from backend.services.video_storage_service import video_storage_service
 from backend.db.database import SessionLocal
 from backend.db.models import Alert
 import cv2
@@ -97,6 +98,10 @@ async def websocket_live_feed(websocket: WebSocket):
                     if risk_score > 50:
                         alert = ml_service.risk_engine.generate_alert(risk_score, risk_factors)
                         
+                        # SMART STORAGE: Trigger recording for significant threats
+                        if risk_score > 70:
+                            video_storage_service.start_recording("CAM-01")
+                        
                         # PERSISTENCE: Save to DB if Critical and cooldown passed
                         now = datetime.utcnow().timestamp()
                         if alert and (now - last_alert_time > ALERT_COOLDOWN):
@@ -104,6 +109,9 @@ async def websocket_live_feed(websocket: WebSocket):
                             loop = asyncio.get_event_loop()
                             await loop.run_in_executor(None, save_alert_sync, alert)
                             last_alert_time = now
+
+                    # Always add frame to active recording if any
+                    video_storage_service.add_frame("CAM-01", frame)
 
                     # Update cache
                     cached_result["detection"] = detection

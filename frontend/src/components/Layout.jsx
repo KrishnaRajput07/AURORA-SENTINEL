@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, AppBar, Toolbar, Typography, IconButton, Container, Button, useTheme, Avatar, Tooltip, Drawer, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
-import { Menu, LayoutDashboard, Video, BarChart2, AlertCircle, Settings, ShieldCheck, Bell, ChevronDown, LogOut, Search } from 'lucide-react';
+import { Menu, LayoutDashboard, Video, BarChart2, AlertCircle, Settings, ShieldCheck, Bell, ChevronDown, LogOut, Search, FileVideo } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -13,7 +13,8 @@ const Layout = ({ children }) => {
     const menuItems = [
         { text: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/' },
         { text: 'Surveillance', icon: <Video size={18} />, path: '/surveillance' },
-        { text: 'Intelligence', icon: <BarChart2 size={18} />, path: '/analytics' },
+        { text: 'Intelligence', icon: <BarChart2 size={18} />, path: '/intelligence' },
+        { text: 'Archives', icon: <FileVideo size={18} />, path: '/archives' },
         { text: 'Alerts', icon: <AlertCircle size={18} />, path: '/alerts' },
         { text: 'System', icon: <Settings size={18} />, path: '/system' },
     ];

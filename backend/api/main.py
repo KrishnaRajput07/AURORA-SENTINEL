@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db.database import engine, Base
-from backend.api.routers import alerts, analytics, video, stream
+from backend.api.routers import alerts, analytics, video, stream, archive
 from backend.services.ml_service import ml_service
 import os
 
@@ -39,6 +39,7 @@ app.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
 app.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
 app.include_router(stream.router, prefix="/ws", tags=["Live Stream"]) # Mounts at /ws/live-feed
 app.include_router(video.router, tags=["Video Processing"]) # Mounts at /process/video (explicit in router)
+app.include_router(archive.router, prefix="/archive", tags=["Archive"])
 
 
 @app.get("/")
