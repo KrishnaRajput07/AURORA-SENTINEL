@@ -102,41 +102,55 @@ const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts pa
 
     // Columns config
     const renderTable = (data, isHistory) => (
-        <TableContainer sx={{ maxHeight: 440 }}>
+        <TableContainer sx={{
+            maxHeight: 440,
+            '&::-webkit-scrollbar': { width: '6px' },
+            '&::-webkit-scrollbar-thumb': { bgcolor: alpha(theme.palette.divider, 0.5), borderRadius: '10px' }
+        }}>
             <Table stickyHeader size="small">
                 <TableHead>
                     <TableRow>
-                        <TableCell sx={{ bgcolor: '#F8FAFC', fontWeight: 600 }}>Time</TableCell>
-                        <TableCell sx={{ bgcolor: '#F8FAFC', fontWeight: 600 }}>Level</TableCell>
-                        <TableCell sx={{ bgcolor: '#F8FAFC', fontWeight: 600 }}>Camera</TableCell>
-                        <TableCell sx={{ bgcolor: '#F8FAFC', fontWeight: 600 }}>Risk</TableCell>
-                        <TableCell sx={{ bgcolor: '#F8FAFC', fontWeight: 600 }}>Status</TableCell>
-                        {isHistory && <TableCell sx={{ bgcolor: '#F8FAFC', fontWeight: 600 }}>Outcome</TableCell>}
-                        <TableCell sx={{ bgcolor: '#F8FAFC', fontWeight: 600 }}>Actions</TableCell>
+                        {['Time', 'Level', 'Camera', 'Risk', 'Status', ...(isHistory ? ['Outcome'] : []), 'Actions'].map((head) => (
+                            <TableCell key={head} sx={{
+                                bgcolor: alpha('#FFFFFF', 0.8),
+                                backdropFilter: 'blur(8px)',
+                                fontWeight: 800,
+                                fontSize: '0.75rem',
+                                color: theme.palette.text.secondary,
+                                borderBottom: `2px solid ${theme.palette.divider}`,
+                                py: 2
+                            }}>
+                                {head.toUpperCase()}
+                            </TableCell>
+                        ))}
                     </TableRow>
                 </TableHead>
                 <TableBody>
-                    <AnimatePresence>
+                    <AnimatePresence mode="popLayout">
                         {data.map((alert, index) => (
                             <TableRow
                                 key={alert.id}
                                 component={motion.tr}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
+                                layout
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ duration: 0.2, delay: index * 0.05 }}
                                 sx={{
-                                    '&:hover': { bgcolor: '#F1F5F9' },
+                                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02) },
+                                    transition: 'background-color 0.2s ease',
+                                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                                     // Pulse animation for pending critical
-                                    animation: (alert.status === 'pending' && alert.level === 'CRITICAL') ? 'pulse-red 2s infinite' : 'none',
-                                    bgcolor: alert.status === 'pending' && alert.level === 'CRITICAL' ? alpha(theme.palette.error.main, 0.05) : 'inherit'
+                                    animation: (alert.status === 'pending' && alert.level === 'CRITICAL') ? 'pulse-red 3s infinite' : 'none',
+                                    bgcolor: alert.status === 'pending' && alert.level === 'CRITICAL' ? alpha(theme.palette.error.main, 0.02) : 'inherit'
                                 }}
                             >
-                                <TableCell>
+                                <TableCell sx={{ py: 2 }}>
                                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                                        <Typography variant="body2" fontWeight={600}>
-                                            {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                        <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
+                                            {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </Typography>
-                                        <Typography variant="caption" color="text.secondary">
+                                        <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.65rem' }}>
                                             {new Date(alert.timestamp).toLocaleDateString()}
                                         </Typography>
                                     </Box>
@@ -148,39 +162,56 @@ const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts pa
                                         sx={{
                                             bgcolor: alpha(getRiskColor(alert.level), 0.1),
                                             color: getRiskColor(alert.level),
-                                            fontWeight: 700,
-                                            height: 24,
-                                            fontSize: '0.7rem'
+                                            fontWeight: 900,
+                                            height: 22,
+                                            fontSize: '0.65rem',
+                                            borderRadius: '6px',
+                                            letterSpacing: '0.05em',
+                                            border: `1px solid ${alpha(getRiskColor(alert.level), 0.2)}`
                                         }}
                                     />
                                 </TableCell>
-                                <TableCell>{alert.camera_id}</TableCell>
-                                <TableCell>
-                                    <Typography fontWeight={700} color={alert.risk_score > 75 ? 'error.main' : 'text.primary'}>
-                                        {alert.risk_score.toFixed(0)}%
-                                    </Typography>
+                                <TableCell sx={{ fontWeight: 600, color: theme.palette.text.secondary }}>
+                                    {alert.camera_id}
                                 </TableCell>
                                 <TableCell>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        {alert.status === 'pending' && <AlertTriangle size={14} color={theme.palette.error.main} />}
-                                        {alert.status === 'acknowledged' && <User size={14} color={theme.palette.warning.main} />}
-                                        {alert.status === 'resolved' && <CheckCircle size={14} color={theme.palette.success.main} />}
-                                        <Typography variant="caption" fontWeight={600} sx={{ textTransform: 'uppercase' }}>
+                                        <Box sx={{
+                                            width: 4,
+                                            height: 20,
+                                            borderRadius: 1,
+                                            bgcolor: getRiskColor(alert.level)
+                                        }} />
+                                        <Typography sx={{ fontWeight: 900, color: theme.palette.text.primary, fontSize: '0.9rem', fontFamily: 'monospace' }}>
+                                            {alert.risk_score.toFixed(0)}%
+                                        </Typography>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Box sx={{
+                                            p: 0.5,
+                                            bgcolor: alert.status === 'pending' ? alpha(theme.palette.error.main, 0.1) :
+                                                alert.status === 'acknowledged' ? alpha(theme.palette.warning.main, 0.1) :
+                                                    alpha(theme.palette.success.main, 0.1),
+                                            borderRadius: '50%',
+                                            display: 'flex'
+                                        }}>
+                                            {alert.status === 'pending' && <AlertTriangle size={12} color={theme.palette.error.main} />}
+                                            {alert.status === 'acknowledged' && <User size={12} color={theme.palette.warning.main} />}
+                                            {alert.status === 'resolved' && <CheckCircle size={12} color={theme.palette.success.main} />}
+                                        </Box>
+                                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
                                             {alert.status}
                                         </Typography>
                                     </Box>
-                                    {alert.operator_name && (
-                                        <Typography variant="caption" display="block" color="text.secondary">
-                                            by {alert.operator_name}
-                                        </Typography>
-                                    )}
                                 </TableCell>
 
                                 {isHistory && (
                                     <TableCell>
-                                        <Typography variant="body2">{alert.resolution_type}</Typography>
-                                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 150, display: 'block' }}>
-                                            {alert.resolution_notes}
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{alert.resolution_type}</Typography>
+                                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 150, display: 'block', fontStyle: 'italic' }}>
+                                            "{alert.resolution_notes}"
                                         </Typography>
                                     </TableCell>
                                 )}
@@ -194,7 +225,13 @@ const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts pa
                                                 color="warning"
                                                 onClick={() => handleAcknowledge(alert)}
                                                 startIcon={<CheckSquare size={14} />}
-                                                sx={{ fontSize: '0.7rem', py: 0.5, px: 1.5 }}
+                                                sx={{
+                                                    fontSize: '0.65rem',
+                                                    fontWeight: 800,
+                                                    borderRadius: '6px',
+                                                    boxShadow: 'none',
+                                                    '&:hover': { boxShadow: `0 4px 12px ${alpha(theme.palette.warning.main, 0.3)}` }
+                                                }}
                                             >
                                                 ACK
                                             </Button>
@@ -205,29 +242,34 @@ const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts pa
                                                 size="small"
                                                 color="success"
                                                 onClick={() => openResolutionDialog(alert)}
-                                                startIcon={<Shield size={14} />}
-                                                sx={{ fontSize: '0.7rem', py: 0.5, px: 2 }}
+                                                sx={{
+                                                    fontSize: '0.65rem',
+                                                    fontWeight: 800,
+                                                    borderRadius: '6px',
+                                                    borderWidth: '2px',
+                                                    '&:hover': { borderWidth: '2px' }
+                                                }}
                                             >
                                                 RESOLVE
                                             </Button>
                                         )}
                                         {alert.status === 'resolved' && (
-                                            <Button disabled size="small" startIcon={<CheckCircle size={14} />}>Done</Button>
+                                            <Chip label="ARCHIVED" size="small" variant="outlined" sx={{ fontSize: '0.6rem', fontWeight: 800 }} />
                                         )}
                                     </Box>
                                 </TableCell>
                             </TableRow>
                         ))}
-                        {data.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                                    No alerts in this queue.
-                                </TableCell>
-                            </TableRow>
-                        )}
                     </AnimatePresence>
                 </TableBody>
             </Table>
+            {data.length === 0 && (
+                <Box sx={{ textAlign: 'center', py: 8, opacity: 0.5 }}>
+                    <Shield size={48} color={theme.palette.divider} style={{ marginBottom: 16 }} />
+                    <Typography variant="body1" fontWeight={700}>System Clear</Typography>
+                    <Typography variant="caption">No active threats detected in this queue.</Typography>
+                </Box>
+            )}
         </TableContainer>
     );
 

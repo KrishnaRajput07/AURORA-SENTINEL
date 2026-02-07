@@ -134,22 +134,19 @@ const LiveFeed = () => {
             position: 'relative',
             width: '100%',
             height: '100%',
-            minHeight: 480,
             bgcolor: '#000',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            borderRadius: 3,
-            border: `1px solid ${theme.palette.divider}`,
         }}>
             {/* Header / Toolbar */}
             <Box sx={{
-                height: 48,
+                height: 32,
                 bgcolor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                px: 2,
+                px: 1.5,
                 borderBottom: `1px solid ${theme.palette.divider}`
             }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -183,7 +180,7 @@ const LiveFeed = () => {
             </Box>
 
             {/* Video Area */}
-            <Box sx={{ flexGrow: 1, position: 'relative', bgcolor: '#1A1A1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box sx={{ flexGrow: 1, position: 'relative', bgcolor: '#000', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflow: 'hidden' }}>
 
                 {/* 1. Raw Video Element (Fallback logic improved) */}
                 <video
@@ -197,7 +194,8 @@ const LiveFeed = () => {
                         // 2. OR we are connected but haven't received a frame yet (processedImageSrc is null)
                         display: (isOfflineMode || !processedImageSrc) ? 'block' : 'none',
                         width: '100%',
-                        height: '100%',
+                        height: 'auto',
+                        maxHeight: '100%',
                         objectFit: 'contain'
                     }}
                 />
@@ -207,7 +205,7 @@ const LiveFeed = () => {
 
                 {/* 3. Processed Feed (Visible only if valid source) */}
                 {processedImageSrc && isConnected && !cameraError && (
-                    <img src={processedImageSrc} alt="Stream" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <img src={processedImageSrc} alt="Stream" style={{ width: '100%', height: 'auto', maxHeight: '100%', objectFit: 'contain' }} />
                 )}
 
                 {/* Status Overlay: Connection Wait */}
@@ -218,56 +216,102 @@ const LiveFeed = () => {
                     </Box>
                 )}
 
-                {/* HUD Overlay - DYNAMIC BACKGROUND */}
+                {/* HUD Overlay - PREMIUM HIGH-TECH DESIGN */}
                 <Box sx={{
                     position: 'absolute',
                     bottom: 0,
                     left: 0,
                     right: 0,
-                    height: 64, // Taller for prominence
-                    bgcolor: alpha(getRiskColor(currentScore), 0.85), // Dynamic Background
-                    backdropFilter: 'blur(12px)',
-                    borderTop: '1px solid rgba(255,255,255,0.3)',
+                    height: 72,
+                    // Rich Gradient Background based on Risk
+                    background: `linear-gradient(to top, 
+                        ${alpha(getRiskColor(currentScore), 0.9)} 0%, 
+                        ${alpha(getRiskColor(currentScore), 0.4)} 100%)`,
+                    backdropFilter: 'blur(16px) saturate(180%)',
+                    borderTop: '1px solid rgba(255,255,255,0.2)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    px: 3,
-                    opacity: 1,
-                    transition: 'background-color 0.5s ease',
-                    boxShadow: '0 -4px 20px rgba(0,0,0,0.2)'
+                    px: 4,
+                    transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: `0 -8px 32px ${alpha(getRiskColor(currentScore), 0.3)}`
                 }}>
-                    {/* Left: Stats */}
+                    {/* Left: Stats with Glow */}
                     <Box sx={{ display: 'flex', gap: 4 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <User size={20} color="#fff" strokeWidth={2.5} />
-                            <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 800, fontFamily: 'monospace' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, opacity: 0.9 }}>
+                            <User size={18} color="#fff" strokeWidth={2.5} />
+                            <Typography variant="h6" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace', fontSize: '1.1rem' }}>
                                 {metadata?.detections?.person_count || 0}
                             </Typography>
                         </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <BoxIcon size={20} color="#fff" strokeWidth={2.5} />
-                            <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 800, fontFamily: 'monospace' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, opacity: 0.9 }}>
+                            <BoxIcon size={18} color="#fff" strokeWidth={2.5} />
+                            <Typography variant="h6" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace', fontSize: '1.1rem' }}>
                                 {metadata?.detections?.object_count || 0}
                             </Typography>
                         </Box>
                     </Box>
 
                     {/* Center: CENTRAL THREAT INDICATOR */}
-                    <Box sx={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
-                        <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700, letterSpacing: '0.15em', lineHeight: 1, display: 'block' }}>
-                            THREAT LEVEL
+                    <Box sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        position: 'absolute',
+                        left: '50%',
+                        transform: 'translateX(-50%)'
+                    }}>
+                        <Typography variant="overline" sx={{
+                            color: 'rgba(255,255,255,0.7)',
+                            fontWeight: 800,
+                            letterSpacing: '0.2em',
+                            lineHeight: 1,
+                            fontSize: '0.65rem'
+                        }}>
+                            STATUS
                         </Typography>
-                        <Typography variant="h5" sx={{ color: '#fff', fontWeight: 900, letterSpacing: '0.05em', lineHeight: 1, mt: 0.5, textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-                            {(currentScore >= 75) ? 'CRITICAL' :
-                                (currentScore >= 50) ? 'HIGH' :
-                                    (currentScore >= 25) ? 'MEDIUM' : 'LOW'}
+                        <Typography variant="h6" sx={{
+                            color: '#fff',
+                            fontWeight: 900,
+                            letterSpacing: '0.1em',
+                            lineHeight: 1,
+                            mt: 0.5,
+                            textShadow: '0 0 12px rgba(255,255,255,0.4)',
+                            fontSize: '0.9rem'
+                        }}>
+                            {(currentScore >= 75) ? 'CRITICAL BREACH' :
+                                (currentScore >= 50) ? 'ELEVATED RISK' :
+                                    (currentScore >= 25) ? 'CAUTION REQ' : 'SECURE'}
                         </Typography>
                     </Box>
 
-                    {/* Right: Percentage */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="h3" sx={{ color: '#fff', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.05em' }}>
-                            {currentScore.toFixed(0)}%
+                    {/* Right: Percentage - High Visibility */}
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: 1,
+                        bgcolor: 'rgba(255,255,255,0.15)',
+                        px: 2,
+                        py: 0.5,
+                        borderRadius: 2,
+                        border: '1px solid rgba(255,255,255,0.2)'
+                    }}>
+                        <Typography variant="overline" sx={{
+                            color: 'rgba(255,255,255,0.8)',
+                            fontWeight: 900,
+                            fontSize: '0.7rem'
+                        }}>
+                            THREAT
+                        </Typography>
+                        <Typography variant="h3" sx={{
+                            color: '#fff',
+                            fontWeight: 900,
+                            fontFamily: 'monospace',
+                            lineHeight: 1,
+                            fontSize: '2rem',
+                            textShadow: '0 0 20px rgba(255,255,255,0.3)'
+                        }}>
+                            {Math.round(currentScore)}%
                         </Typography>
                     </Box>
                 </Box>

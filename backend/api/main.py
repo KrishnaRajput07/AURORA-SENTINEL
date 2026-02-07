@@ -14,7 +14,12 @@ app = FastAPI(title="AURORA-SENTINEL API", version="2.0.0")
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,8 +30,7 @@ app.add_middleware(
 async def startup_event():
     ml_service.load_models()
 
-# Include Routers
-from backend.api.routers import alerts, analytics, video, stream
+# Routers are included below using 'app.include_router'
 
 # ... imports ...
 

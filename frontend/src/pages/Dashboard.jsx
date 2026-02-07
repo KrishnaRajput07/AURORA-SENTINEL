@@ -62,14 +62,15 @@ const Dashboard = () => {
                 <motion.div variants={cardVariants} initial="hidden" animate="visible">
                     <Paper sx={{
                         p: 0,
-                        height: 520,
+                        height: 400,
                         display: 'flex',
                         flexDirection: 'column',
                         overflow: 'hidden'
                     }}>
                         {/* Clean Header */}
                         <Box sx={{
-                            p: 3,
+                            py: 2,
+                            px: 3,
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
@@ -94,17 +95,18 @@ const Dashboard = () => {
 
             <Grid item xs={12} lg={4}>
                 <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
-                    <Paper sx={{ p: 0, height: 520, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <Paper sx={{ p: 0, height: 400, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                         <Box sx={{
-                            p: 3,
+                            py: 1,
+                            px: 2.5,
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 1.5,
+                            gap: 1.25,
                         }}>
-                            <Box sx={{ p: 1, bgcolor: '#FFF7ED', borderRadius: '50%' }}> {/* Soft orange bg */}
-                                <Shield size={20} color={theme.palette.secondary.main} />
+                            <Box sx={{ p: 0.75, bgcolor: '#FFF7ED', borderRadius: '50%' }}> {/* Soft orange bg */}
+                                <Shield size={16} color={theme.palette.secondary.main} />
                             </Box>
-                            <Typography variant="h6" sx={{ fontSize: '1rem', color: theme.palette.text.primary }}>
+                            <Typography variant="h6" sx={{ fontSize: '0.9rem', color: theme.palette.text.primary, fontWeight: 700 }}>
                                 Camera Feed
                             </Typography>
                         </Box>
