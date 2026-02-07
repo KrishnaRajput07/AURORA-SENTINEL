@@ -8,7 +8,7 @@ const SystemPage = () => {
     const theme = useTheme();
 
     useEffect(() => {
-        fetch('http://localhost:8000/health')
+        fetch('http://localhost:8001/health')
             .then(res => res.json())
             .then(data => setHealth(data))
             .catch(err => console.error(err));

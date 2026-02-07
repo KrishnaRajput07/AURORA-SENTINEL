@@ -254,15 +254,26 @@ const Intelligence = () => {
 
                     {/* Pro Video Player Section */}
                     <Box sx={{ flexGrow: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        <Box sx={{ position: 'relative', bgcolor: '#000', borderRadius: 4, overflow: 'hidden', boxShadow: '0 30px 60px rgba(0,0,0,0.5)', border: '1px solid #333' }}>
+                        <Box sx={{ position: 'relative', bgcolor: '#000', borderRadius: 4, overflow: 'hidden', boxShadow: '0 30px 60px rgba(0,0,0,0.5)', border: '1px solid #333', minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <video
                                 ref={videoRef}
-                                src={analysisResult ? `http://localhost:8000${analysisResult.processed_url}` : null}
+                                src={analysisResult?.processed_url ? `http://localhost:8000${analysisResult.processed_url}` : null}
                                 controls
-                                style={{ width: '100%', display: 'block' }}
+                                style={{ width: '100%', maxHeight: '70vh', display: analysisResult?.processed_url ? 'block' : 'none' }}
+                                onError={(e) => {
+                                    console.error("Video Error:", e);
+                                    // Fallback to original file or show error
+                                }}
                             />
-                            <Box sx={{ position: 'absolute', top: 20, left: 20, pointerEvents: 'none' }}>
-                                <Chip label="SKELETON CAPTURE ON" size="small" color="error" sx={{ fontWeight: 900, borderRadius: 1 }} />
+                            {!analysisResult?.processed_url && (
+                                <Box sx={{ textAlign: 'center', p: 4 }}>
+                                    <CircularProgress color="primary" />
+                                    <Typography sx={{ mt: 2, color: 'rgba(255,255,255,0.5)' }}>Loading Forensic Stream...</Typography>
+                                </Box>
+                            )}
+                            <Box sx={{ position: 'absolute', top: 20, left: 20, pointerEvents: 'none', display: 'flex', gap: 1 }}>
+                                <Chip label="AI RENDERING" size="small" color="error" sx={{ fontWeight: 900, borderRadius: 1 }} />
+                                <Chip label="H.264" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: '#fff', fontWeight: 900, borderRadius: 1 }} />
                             </Box>
                         </Box>
 

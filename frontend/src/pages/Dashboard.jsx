@@ -24,7 +24,7 @@ const Dashboard = () => {
 
     const fetchAlerts = async () => {
         try {
-            const response = await fetch('http://localhost:8000/alerts/recent');
+            const response = await fetch('http://localhost:8001/alerts/recent');
             const data = await response.json();
             setAlerts(data.alerts);
         } catch (error) { console.error('Error fetching alerts:', error); }
@@ -32,7 +32,7 @@ const Dashboard = () => {
 
     const fetchRiskData = async () => {
         try {
-            const response = await fetch('http://localhost:8000/analytics/dashboard');
+            const response = await fetch('http://localhost:8001/analytics/dashboard');
             const data = await response.json();
             setRiskData(data);
         } catch (error) { console.error('Error fetching risk data:', error); }

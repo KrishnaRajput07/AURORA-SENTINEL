@@ -68,7 +68,7 @@ const LiveFeed = () => {
     }, []);
 
     const connectWebSocket = () => {
-        const ws = new WebSocket(`ws://localhost:8000/ws/live-feed`);
+        const ws = new WebSocket(`ws://localhost:8001/ws/live-feed`);
         wsRef.current = ws;
         ws.onopen = () => {
             setIsConnected(true);

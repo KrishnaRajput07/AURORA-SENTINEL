@@ -35,8 +35,14 @@ async def process_video_file_task(video_path: str):
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, out_name)
     
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*'H264') # Higher compatibility, fallback to 'avc1' if needed
+    if os.name == 'nt':
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
     out = cv2.VideoWriter(out_path, fourcc, fps, (w, h))
+    if not out.isOpened():
+        print(f"Warning: Failed to open VideoWriter with fourcc {fourcc}. Falling back to mp4v.")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(out_path, fourcc, fps, (w, h))
     
     frame_count, alerts, patterns, max_p = 0, [], [], 0
     db = SessionLocal()

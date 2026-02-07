@@ -17,8 +17,8 @@ const AnalyticsPage = () => {
     const fetchData = async () => {
         try {
             const [riskRes, alertsRes] = await Promise.all([
-                fetch('http://localhost:8000/analytics/dashboard'),
-                fetch('http://localhost:8000/alerts/recent')
+                fetch('http://localhost:8001/analytics/dashboard'),
+                fetch('http://localhost:8001/alerts/recent')
             ]);
 
             const rData = await riskRes.json();

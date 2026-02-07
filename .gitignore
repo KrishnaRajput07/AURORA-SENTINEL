@@ -23,3 +23,6 @@ Thumbs.db
 
 # Large sample video that exceeds GitHub 100MB limit
 data/sample_videos/Normal_Videos_for_Event_Recognition/Normal_Videos_634_x264.mp4
+
+# Local Storage
+storage/

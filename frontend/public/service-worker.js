@@ -20,8 +20,19 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+    // Only intercept http/https requests
+    if (!event.request.url.startsWith('http')) return;
+
     event.respondWith(
         caches.match(event.request)
-            .then((response) => response || fetch(event.request))
+            .then((cachedResponse) => {
+                if (cachedResponse) return cachedResponse;
+
+                return fetch(event.request).catch((err) => {
+                    console.warn('[Service Worker] Fetch failed:', event.request.url, err);
+                    // Optionally return a fallback or rethrow
+                    throw err;
+                });
+            })
     );
 });

@@ -9,7 +9,7 @@ import DemoAnalysis from './pages/DemoAnalysis';
 import AlertsPage from './pages/Alerts';
 import AnalyticsPage from './pages/Analytics';
 import SystemPage from './pages/System';
-import IntelligencePage from './pages/DemoAnalysis'; // Temporary link to DemoAnalysis until new Intelligence.jsx is ready
+import Intelligence from './pages/Intelligence';
 import ArchivesPage from './pages/Archives';
 import NetworkStatusIndicator from './components/NetworkStatusIndicator';
 
@@ -22,7 +22,7 @@ function App() {
                 <Routes>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/surveillance" element={<LiveSurveillance />} />
-                    <Route path="/intelligence" element={<IntelligencePage />} />
+                    <Route path="/intelligence" element={<Intelligence />} />
                     <Route path="/archives" element={<ArchivesPage />} />
                     <Route path="/alerts" element={<AlertsPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
