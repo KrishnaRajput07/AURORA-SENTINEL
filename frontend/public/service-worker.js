@@ -4,7 +4,7 @@
 // See https://developers.google.com/web/tools/workbox/modules/workbox-strategies
 // for other available strategies.
 
-const CACHE_NAME = 'aurora-sentinel-v1';
+const CACHE_NAME = 'aurora-sentinel-v3';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -17,6 +17,25 @@ self.addEventListener('install', (event) => {
         caches.open(CACHE_NAME)
             .then((cache) => cache.addAll(urlsToCache))
     );
+    // Force the waiting service worker to become the active service worker
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('[Service Worker] Deleting old cache:', cacheName);
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        })
+    );
+    // Take control of all pages immediately
+    return self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {

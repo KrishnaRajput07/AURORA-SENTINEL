@@ -167,6 +167,7 @@ async def websocket_live_feed(websocket: WebSocket):
             try:
                 await websocket.send_json({
                     "risk_score": risk_score,
+                    "risk_factors": risk_factors, # Added detailed factors
                     "alert": alert,
                     "detections": {
                         "person_count": len(detection.get('poses', [])),

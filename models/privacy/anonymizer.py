@@ -16,16 +16,43 @@ class PrivacyAnonymizer:
             print(f"Error loading face cascade: {e}")
             self.face_cascade = None
         
-    def detect_faces(self, frame):
-        """Detect faces and return bounding boxes"""
-        if self.face_cascade is None:
-            return []
-            
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = self.face_cascade.detectMultiScale(
-            gray, scaleFactor=1.2, minNeighbors=5, minSize=(30, 30)
-        )
-        return faces
+    def detect_faces(self, frame, poses=None):
+        """Detect faces using YOLO keypoints (primary) or Haar (fallback)"""
+        face_rects = []
+        
+        # 1. Use YOLO keypoints if available (Keypoints 0-4 are head)
+        if poses:
+            for pose in poses:
+                kpts = np.array(pose['keypoints'])
+                conf = np.array(pose['confidence'])
+                
+                # If we have nose and eyes/ears with good confidence
+                head_idxs = [0, 1, 2, 3, 4]
+                v_kpts = [kpts[i] for i in head_idxs if i < len(conf) and conf[i] > 0.3]
+                
+                if len(v_kpts) >= 2:
+                    v_kpts = np.array(v_kpts)
+                    x_min, y_min = np.min(v_kpts, axis=0)
+                    x_max, y_max = np.max(v_kpts, axis=0)
+                    
+                    # Add padding based on person height
+                    p_height = pose['bbox'][3] - pose['bbox'][1]
+                    padding = p_height * 0.15
+                    
+                    x, y = int(x_min - padding), int(y_min - padding)
+                    w, h = int((x_max - x_min) + 2*padding), int((y_max - y_min) + 2*padding)
+                    face_rects.append((x, y, w, h))
+        
+        # 2. Add Haar detections if YOLO missed or wasn't provided
+        if self.face_cascade is not None and not face_rects:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            haar_faces = self.face_cascade.detectMultiScale(
+                gray, scaleFactor=1.2, minNeighbors=5, minSize=(30, 30)
+            )
+            for (x, y, w, h) in haar_faces:
+                face_rects.append((x, y, w, h))
+                
+        return face_rects
 
     def anonymize_frame(self, frame, poses=None, mode='blur', face_rects=None):
         """
@@ -43,46 +70,43 @@ class PrivacyAnonymizer:
         if mode == 'skeleton' and poses:
             return self._extract_skeleton(frame, poses)
         elif mode == 'blur':
-            return self._blur_faces(frame, face_rects)
+            return self._blur_faces(frame, face_rects, poses)
         elif mode == 'pixelate':
             return self._pixelate_faces(frame)
         else:
             return frame
     
-    def _blur_faces(self, frame, face_rects=None):
-        """Gaussian blur on faces"""
-        if self.face_cascade is None and face_rects is None:
-            return frame
-            
+    def _blur_faces(self, frame, face_rects=None, poses=None):
+        """Premium Multi-Pass Gaussian Blur on faces"""
         # Detect if not provided
         if face_rects is None:
-            face_rects = self.detect_faces(frame)
+            face_rects = self.detect_faces(frame, poses)
         
         result = frame.copy()
         for (x, y, w, h) in face_rects:
             # Clamp coordinates
             h_img, w_img = frame.shape[:2]
-            x = max(0, x)
-            y = max(0, y)
-            w = min(w, w_img - x)
-            h = min(h, h_img - y)
+            x, y = max(0, x), max(0, y)
+            w, h = min(w, w_img - x), min(h, h_img - y)
             
-            if w <= 0 or h <= 0: continue
+            if w <= 10 or h <= 10: continue
 
             # Extract face region
             face_region = result[y:y+h, x:x+w]
             
-            # Apply strong Gaussian blur
-            # Kernel size must be odd
-            ksize = (99, 99)
-            if w < 100 or h < 100:
-                ksize = (int(w/2)*2+1, int(h/2)*2+1) # dynamic kernel size
-            
             try:
-                blurred = cv2.GaussianBlur(face_region, ksize, 30)
-                result[y:y+h, x:x+w] = blurred
+                # Premium Multi-Pass Blur
+                # 1. Box Blur (Pre-pass)
+                box_blurred = cv2.blur(face_region, (25, 25))
+                # 2. Strong Gaussian Blur
+                ksize = (int(w/1.5)*2+1, int(h/1.5)*2+1) if w < 100 else (99, 99)
+                final_blur = cv2.GaussianBlur(box_blurred, ksize, 30)
+                
+                result[y:y+h, x:x+w] = final_blur
             except:
                 pass
+        
+        return result
         
         return result
     

@@ -68,7 +68,7 @@ const LiveFeed = () => {
     }, []);
 
     const connectWebSocket = () => {
-        const ws = new WebSocket(`ws://localhost:8001/ws/live-feed`);
+        const ws = new WebSocket(`ws://localhost:8000/ws/live-feed`);
         wsRef.current = ws;
         ws.onopen = () => {
             setIsConnected(true);
@@ -122,6 +122,8 @@ const LiveFeed = () => {
 
     // Helpers for Risk Display
     const currentScore = metadata?.risk_score || 0;
+    const riskFactors = metadata?.risk_factors || {};
+
     const getRiskColor = (s) => {
         if (s >= 75) return theme.palette.error.main;
         if (s >= 50) return theme.palette.warning.main;
@@ -213,6 +215,50 @@ const LiveFeed = () => {
                     <Box sx={{ textAlign: 'center', color: theme.palette.info.main, position: 'absolute' }}>
                         <RefreshCw size={24} className="spin" style={{ animation: 'spin 2s linear infinite' }} />
                         <Typography variant="caption" sx={{ mt: 1, display: 'block', fontWeight: 600 }}>SYNCHRONIZING AI...</Typography>
+                    </Box>
+                )}
+
+                {/* 4. Risk Factor Breakdown Overlay (Right Side) */}
+                {processedImageSrc && (
+                    <Box sx={{
+                        position: 'absolute',
+                        top: 20,
+                        right: 20,
+                        width: 200,
+                        bgcolor: 'rgba(0,0,0,0.6)',
+                        backdropFilter: 'blur(8px)',
+                        borderRadius: 2,
+                        p: 2,
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        transition: 'opacity 0.3s',
+                        opacity: currentScore > 10 ? 1 : 0.3 // Dim if low risk
+                    }}>
+                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 700, mb: 1, display: 'block' }}>
+                            RISK BREAKDOWN
+                        </Typography>
+                        {Object.entries(riskFactors).map(([key, val]) => (
+                            val > 0.1 && ( // Only show significant factors
+                                <Box key={key} sx={{ mb: 1.5 }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                        <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem', textTransform: 'uppercase' }}>
+                                            {key.replace('_', ' ')}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: getRiskColor(val * 100), fontWeight: 700 }}>
+                                            {Math.round(val * 100)}%
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ width: '100%', height: 4, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
+                                        <Box sx={{
+                                            width: `${val * 100}%`,
+                                            height: '100%',
+                                            bgcolor: getRiskColor(val * 100),
+                                            borderRadius: 2,
+                                            transition: 'width 0.5s ease'
+                                        }} />
+                                    </Box>
+                                </Box>
+                            )
+                        ))}
                     </Box>
                 )}
 

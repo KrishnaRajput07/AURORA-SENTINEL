@@ -16,7 +16,7 @@ const ArchiveGallery = () => {
     const fetchClips = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`http://localhost:8001/archive/list?source=${tab}`);
+            const response = await fetch(`http://localhost:8000/archive/list?source=${tab}`);
             const data = await response.json();
             setClips(data.clips || []);
         } catch (error) {
@@ -28,7 +28,7 @@ const ArchiveGallery = () => {
 
     const handleDownload = (clip) => {
         const link = document.createElement('a');
-        link.href = `http://localhost:8001${clip.url}`;
+        link.href = `http://localhost:8000${clip.url}`;
         link.download = clip.name;
         document.body.appendChild(link);
         link.click();

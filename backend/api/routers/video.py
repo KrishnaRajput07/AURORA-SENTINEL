@@ -5,6 +5,7 @@ import numpy as np
 from datetime import datetime
 import tempfile
 from backend.services.ml_service import ml_service
+from models.scoring.risk_engine import RiskScoringEngine
 from backend.db.database import SessionLocal
 from backend.db.models import Alert
 
@@ -28,6 +29,11 @@ async def process_video_file_task(video_path: str):
 
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    
+    # Initialize a FRESH local engine for this specific forensic analysis
+    # This prevents using live feed calibration or history
+    video_engine = RiskScoringEngine(fps=fps)
+    
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
     out_name = f"proc_{os.path.basename(video_path)}"
@@ -44,7 +50,8 @@ async def process_video_file_task(video_path: str):
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(out_path, fourcc, fps, (w, h))
     
-    frame_count, alerts, patterns, max_p = 0, [], [], 0
+    frame_count, alerts, max_p = 0, [], 0
+    motion_patterns_set = set()  # Track unique patterns
     db = SessionLocal()
     
     try:
@@ -54,7 +61,16 @@ async def process_video_file_task(video_path: str):
             
             if frame_count % 6 == 0:
                 det = ml_service.detector.process_frame(frame)
-                risk, facts = ml_service.risk_engine.calculate_risk(det, {'hour': datetime.now().hour})
+                timestamp = frame_count / fps
+                risk, facts = ml_service.risk_engine.calculate_risk(det, {
+                    'hour': datetime.now().hour,
+                    'timestamp': timestamp
+                })
+                
+                # Detect motion patterns
+                patterns = ml_service.risk_engine.detect_motion_patterns(det['poses'])
+                for pattern in patterns:
+                    motion_patterns_set.add(pattern)
                 
                 for obj in det['objects']:
                     b = obj['bbox']
@@ -75,12 +91,17 @@ async def process_video_file_task(video_path: str):
         out.release()
         db.close()
     
+    # Convert motion patterns set to list
+    motion_patterns_list = sorted(list(motion_patterns_set))[:10]  # Top 10 patterns
+    if not motion_patterns_list:
+        motion_patterns_list = ["No aggressive motion vectors detected"]
+    
     return {
         "alerts": alerts,
         "processed_url": f"/archive/download/{out_name}?source=processed",
         "metrics": {
             "max_persons": max_p,
-            "suspicious_patterns": sorted(list(set([f"Significant risk at {a['timestamp_seconds']:.1f}s" for a in alerts if a['score'] > 60])))[:5],
+            "suspicious_patterns": motion_patterns_list,
             "fight_probability": max([a['score'] for a in alerts] + [0])
         }
     }

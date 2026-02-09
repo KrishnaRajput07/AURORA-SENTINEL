@@ -51,7 +51,7 @@ const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts pa
 
     const fetchHistory = async () => {
         try {
-            const res = await fetch('http://localhost:8001/alerts/history');
+            const res = await fetch('http://localhost:8000/alerts/history');
             const data = await res.json();
             setHistoryAlerts(data.alerts);
         } catch (e) { console.error(e); }
@@ -59,7 +59,7 @@ const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts pa
 
     const handleAcknowledge = async (alert) => {
         try {
-            await fetch(`http://localhost:8001/alerts/${alert.id}/acknowledge`, {
+            await fetch(`http://localhost:8000/alerts/${alert.id}/acknowledge`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ operator_name: 'Officer DB' }) // Mock operator
@@ -78,7 +78,7 @@ const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts pa
     const submitResolution = async () => {
         if (!selectedAlert || !resolutionType) return;
         try {
-            await fetch(`http://localhost:8001/alerts/${selectedAlert.id}/resolve`, {
+            await fetch(`http://localhost:8000/alerts/${selectedAlert.id}/resolve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

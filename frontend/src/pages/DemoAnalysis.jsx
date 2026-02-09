@@ -39,7 +39,7 @@ const DemoAnalysis = () => {
         }, 500);
 
         try {
-            const response = await fetch('http://localhost:8001/process/video', {
+            const response = await fetch('http://localhost:8000/process/video', {
                 method: 'POST',
                 body: formData,
             });

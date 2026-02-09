@@ -36,48 +36,41 @@ class UnifiedDetector:
             28: 'suitcase',
         }
         
+        # Initialize Simple Tracker (Fallback since YOLO track crashes on Windows)
+        self.tracker = SimpleTracker()
+        
     def detect_objects(self, frame):
         """
-        Detect and TRACK objects in frame using ByteTrack
+        Detect and TRACK objects in frame using SimpleTracker
         Returns: list of detections with track_ids
         """
-        # Enable tracking with ByteTrack
-        # persist=True is crucial for ID consistency across frames
-        # Enable tracking with ByteTrack
-        # persist=True is crucial for ID consistency across frames
-        # CRASH FIX: use predict() instead of track() on Windows CPU to avoid LAP/tracker crashes
+        # Run standard prediction (safer than track() on Windows)
         results = self.object_model.predict(
             frame, 
-            # persist=True, 
-            # tracker="bytetrack.yaml", 
             verbose=False, 
             device=self.device,
-            classes=list(self.critical_objects.keys()) # Filter classes early if possible
+            classes=list(self.critical_objects.keys())
         )[0]
         
-        detections = []
+        raw_boxes = []
         
-        if results.boxes is None:
-            return detections
-
-        for box in results.boxes:
-            cls = int(box.cls[0])
-            conf = float(box.conf[0])
-            xyxy = box.xyxy[0].cpu().numpy()
-            
-            # Get track ID if available from tracker
-            track_id = int(box.id[0]) if box.id is not None else -1
-            
-            if cls in self.critical_objects and conf > 0.3: # Lowered threshold slightly for better tracking continuity
-                detections.append({
-                    'class': self.critical_objects[cls],
-                    'confidence': conf,
-                    'bbox': xyxy.tolist(),
-                    'center': self._get_center(xyxy),
-                    'track_id': track_id
-                })
+        if results.boxes is not None:
+            for box in results.boxes:
+                cls = int(box.cls[0])
+                conf = float(box.conf[0])
+                xyxy = box.xyxy[0].cpu().numpy()
+                
+                if cls in self.critical_objects and conf > 0.3:
+                    raw_boxes.append({
+                        'class': self.critical_objects[cls],
+                        'confidence': conf,
+                        'bbox': xyxy.tolist()
+                    })
+                
+        # Update Tracker
+        tracked_objects = self.tracker.update(raw_boxes)
         
-        return detections
+        return tracked_objects
     
     def detect_poses(self, frame):
         """
@@ -126,16 +119,67 @@ class UnifiedDetector:
         objects = self.detect_objects(frame)
         
         # 2. Run Pose Estimation
-        # Improvement: Correlation Check?
-        # Ideally, we map poses to tracked objects. 
-        # For now, we return them separately but could match by IoU later.
         poses = self.detect_poses(frame)
+        
+        # 3. Match Poses to Tracked Objects (Critical for Risk Engine)
+        self._assign_tracks_to_poses(objects, poses)
         
         return {
             'objects': objects,
             'poses': poses,
             'timestamp': cv2.getTickCount() / cv2.getTickFrequency()
         }
+        
+    def _assign_tracks_to_poses(self, objects, poses):
+        """
+        Match detected poses to tracked person objects using IoU/Distance
+        Adds 'track_id' to pose dict if matched
+        """
+        if not objects or not poses:
+            return
+            
+        # Filter for person objects only
+        persons = [obj for obj in objects if obj['class'] == 'person' and 'track_id' in obj]
+        
+        for pose in poses:
+            if 'bbox' not in pose or not pose['bbox']:
+                continue
+                
+            pose_box = pose['bbox']
+            best_match = None
+            max_iou = 0.0
+            
+            for person in persons:
+                # Calculate IoU
+                iou = self._calculate_iou(pose_box, person['bbox'])
+                if iou > max_iou:
+                    max_iou = iou
+                    best_match = person
+            
+            # If good match found, assign track ID
+            if best_match and max_iou > 0.5:
+                pose['track_id'] = best_match['track_id']
+                
+    def _calculate_iou(self, boxA, boxB):
+        # determine the (x, y)-coordinates of the intersection rectangle
+        xA = max(boxA[0], boxB[0])
+        yA = max(boxA[1], boxB[1])
+        xB = min(boxA[2], boxB[2])
+        yB = min(boxA[3], boxB[3])
+
+        # compute the area of intersection rectangle
+        interArea = max(0, xB - xA) * max(0, yB - yA)
+
+        # compute the area of both the prediction and ground-truth
+        # rectangles
+        boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
+        boxBArea = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
+
+        # compute the intersection over union by taking the intersection
+        # area and dividing it by the sum of prediction + ground-truth
+        # areas - the interesection area
+        iou = interArea / float(boxAArea + boxBArea - interArea + 1e-6)
+        return iou
     
     @staticmethod
     def _get_center(bbox):
@@ -152,4 +196,77 @@ if __name__ == "__main__":
     dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
     results = detector.process_frame(dummy_frame)
     print(f"Test Successful: {len(results['objects'])} objects, {len(results['poses'])} people detected.")
+
+
+class SimpleTracker:
+    def __init__(self):
+        self.tracks = {} # id -> box
+        self.next_id = 0
+        self.max_age = 30 # Lost frames before deleting
+        self.track_age = {} # id -> age
+
+    def update(self, detections):
+        if not detections:
+            self._increment_ages()
+            return []
+
+        current_dets = []
+        for det in detections:
+            det['center'] = self._get_center(det['bbox'])
+            det['track_id'] = -1
+            current_dets.append(det)
+
+        matched_tracks = set()
+        
+        for det in current_dets:
+            best_iou = 0
+            best_tid = -1
+            
+            for tid, track_box in self.tracks.items():
+                if tid in matched_tracks: continue
+                
+                iou = self._calculate_iou(det['bbox'], track_box)
+                if iou > 0.3 and iou > best_iou:
+                    best_iou = iou
+                    best_tid = tid
+            
+            if best_tid != -1:
+                det['track_id'] = best_tid
+                self.tracks[best_tid] = det['bbox']
+                self.track_age[best_tid] = 0
+                matched_tracks.add(best_tid)
+            else:
+                det['track_id'] = self.next_id
+                self.tracks[self.next_id] = det['bbox']
+                self.track_age[self.next_id] = 0
+                self.next_id += 1
+        
+        for tid in list(self.tracks.keys()):
+            if tid not in matched_tracks:
+                self.track_age[tid] += 1
+                if self.track_age[tid] > self.max_age:
+                    del self.tracks[tid]
+                    del self.track_age[tid]
+                    
+        return current_dets
+
+    def _increment_ages(self):
+        for tid in list(self.tracks.keys()):
+            self.track_age[tid] += 1
+            if self.track_age[tid] > self.max_age:
+                del self.tracks[tid]
+                del self.track_age[tid]
+
+    def _get_center(self, bbox):
+        return [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
+
+    def _calculate_iou(self, boxA, boxB):
+        xA = max(boxA[0], boxB[0])
+        yA = max(boxA[1], boxB[1])
+        xB = min(boxA[2], boxB[2])
+        yB = min(boxA[3], boxB[3])
+        interArea = max(0, xB - xA) * max(0, yB - yA)
+        boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
+        boxBArea = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
+        return interArea / float(boxAArea + boxBArea - interArea + 1e-6)
 

@@ -1,7 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Box, Typography, Paper, Grid, Button, IconButton, LinearProgress, Drawer, List, ListItem, alpha, useTheme, Chip, Divider, CircularProgress } from '@mui/material';
-import { Upload, FileVideo, X, Play, Shield, Search, ChevronRight, AlertTriangle, CheckCircle2, Clock, Activity, Users, Target, Rewind, Maximize2 } from 'lucide-react';
+import { Upload, FileVideo, X, Play, Shield, Search, ChevronRight, AlertTriangle, CheckCircle2, Clock, Activity, Users, Target, Rewind, Maximize2, FileText } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const Intelligence = () => {
     const [file, setFile] = useState(null);
@@ -58,6 +60,101 @@ const Intelligence = () => {
             videoRef.current.currentTime = seconds;
             videoRef.current.play();
         }
+    };
+
+    const generatePDFReport = () => {
+        if (!analysisResult) return;
+
+        const doc = new jsPDF();
+
+        // Header
+        doc.setFontSize(22);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(33, 150, 243);
+        doc.text('AURORA-SENTINEL', 20, 20);
+
+        doc.setFontSize(16);
+        doc.setTextColor(0, 0, 0);
+        doc.text('Forensic Intelligence Report', 20, 30);
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 38);
+        doc.text(`Video: ${file?.name || 'Unknown'}`, 20, 44);
+
+        // Summary Section
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Executive Summary', 20, 56);
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Fight Probability: ${analysisResult.metrics.fight_probability}%`, 20, 66);
+        doc.text(`Maximum Persons Detected: ${analysisResult.metrics.max_persons}`, 20, 73);
+        doc.text(`Total Alerts Generated: ${analysisResult.alerts.length}`, 20, 80);
+
+        // Suspicious Patterns
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Suspicious Motion Patterns', 20, 92);
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        if (analysisResult.metrics.suspicious_patterns.length > 0) {
+            analysisResult.metrics.suspicious_patterns.forEach((pattern, i) => {
+                doc.text(`• ${pattern}`, 25, 100 + (i * 6));
+            });
+        } else {
+            doc.text('• No aggressive motion vectors detected', 25, 100);
+        }
+
+        // Alerts Timeline Table
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        const tableStartY = 100 + (analysisResult.metrics.suspicious_patterns.length * 6) + 10;
+        doc.text('Detailed Alert Timeline', 20, tableStartY);
+
+        const tableData = analysisResult.alerts.map(alert => [
+            `${Math.floor(alert.timestamp_seconds / 60)}:${(alert.timestamp_seconds % 60).toFixed(0).padStart(2, '0')}`,
+            alert.level.toUpperCase(),
+            `${alert.score}%`,
+            alert.top_factors.join(', ')
+        ]);
+
+        autoTable(doc, {
+            head: [['Time', 'Risk Level', 'Score', 'Contributing Factors']],
+            body: tableData,
+            startY: tableStartY + 6,
+            theme: 'grid',
+            headStyles: { fillColor: [33, 150, 243], fontStyle: 'bold' },
+            styles: { fontSize: 9, cellPadding: 3 },
+            columnStyles: {
+                0: { cellWidth: 25 },
+                1: { cellWidth: 30 },
+                2: { cellWidth: 20 },
+                3: { cellWidth: 'auto' }
+            }
+        });
+
+        // Footer
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text(
+                `AURORA-SENTINEL v2.0 PRO | Page ${i} of ${pageCount} | Confidential`,
+                doc.internal.pageSize.getWidth() / 2,
+                doc.internal.pageSize.getHeight() - 10,
+                { align: 'center' }
+            );
+        }
+
+        // Save
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        doc.save(`AURORA-Forensic-Report-${timestamp}.pdf`);
     };
 
     return (
@@ -214,7 +311,7 @@ const Intelligence = () => {
                                                                 </Typography>
                                                                 <Box>
                                                                     <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{alert.level} RISK DETECTED</Typography>
-                                                                    <Typography variant="caption">Contributing: {alert.top_factors.map(f => f.name).join(', ')}</Typography>
+                                                                    <Typography variant="caption">Contributing: {alert.top_factors.join(', ')}</Typography>
                                                                 </Box>
                                                             </Box>
                                                             <ChevronRight size={20} />
@@ -308,7 +405,7 @@ const Intelligence = () => {
                                             <Typography sx={{ fontWeight: 900, color: theme.palette.primary.main }}>{alert.timestamp_seconds.toFixed(1)}s</Typography>
                                             <Box>
                                                 <Typography variant="body2" sx={{ fontWeight: 800 }}>{alert.level} RISK EVENT</Typography>
-                                                <Typography variant="caption" sx={{ opacity: 0.6 }}>Confidence: {alert.score}% | Factors: {alert.top_factors.map(f => f.name).join(', ')}</Typography>
+                                                <Typography variant="caption" sx={{ opacity: 0.6 }}>Confidence: {alert.score}% | Factors: {alert.top_factors.join(', ')}</Typography>
                                             </Box>
                                         </Box>
                                     </ListItem>
@@ -319,7 +416,14 @@ const Intelligence = () => {
 
                     {/* Footer Action */}
                     <Box sx={{ p: 3, borderTop: '1px solid #333', bgcolor: '#111' }}>
-                        <Button fullWidth variant="contained" size="large" sx={{ py: 2, borderRadius: 3, fontWeight: 900, textTransform: 'none' }}>
+                        <Button
+                            fullWidth
+                            variant="contained"
+                            size="large"
+                            onClick={generatePDFReport}
+                            startIcon={<FileText size={20} />}
+                            sx={{ py: 2, borderRadius: 3, fontWeight: 900, textTransform: 'none' }}
+                        >
                             Generate Forensic PDF Report
                         </Button>
                     </Box>

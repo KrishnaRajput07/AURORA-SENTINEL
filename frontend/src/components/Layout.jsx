@@ -1,94 +1,211 @@
 import React, { useState } from 'react';
-import { Box, AppBar, Toolbar, Typography, IconButton, Container, Button, useTheme, Avatar, Tooltip, Drawer, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
-import { Menu, LayoutDashboard, Video, BarChart2, AlertCircle, Settings, ShieldCheck, Bell, ChevronDown, LogOut, Search, FileVideo } from 'lucide-react';
+import { Box, AppBar, Toolbar, Typography, IconButton, Container, Button, useTheme, Avatar, Tooltip, Drawer, List, ListItem, ListItemIcon, ListItemText, Menu as MuiMenu, MenuItem, Badge, Popover } from '@mui/material';
+import { Menu, LayoutDashboard, Video, BarChart2, AlertCircle, Settings, ShieldCheck, Bell, ChevronDown, LogOut, Search, FileVideo, Info, ShieldAlert, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
+import logoImage from '../assets/logo.png';
+import { format } from 'date-fns';
+import { useAuth } from '../context/AuthContext';
 
 const Layout = ({ children }) => {
     const theme = useTheme();
     const navigate = useNavigate();
     const location = useLocation();
+    const { user, logout } = useAuth();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [anchorEl, setAnchorEl] = useState(null);
+    const [profileAnchor, setProfileAnchor] = useState(null);
+    const [notifications, setNotifications] = useState([
+        { id: 1, title: 'Loitering Detected', time: new Date(), level: 'Warning' },
+        { id: 2, title: 'Unauthorized Entry', time: new Date(Date.now() - 1000 * 60 * 5), level: 'Critical' },
+        { id: 3, title: 'Camera 04 Offline', time: new Date(Date.now() - 1000 * 60 * 15), level: 'Info' }
+    ]);
+
+    const handleNotifClick = (event) => setAnchorEl(event.currentTarget);
+    const handleNotifClose = () => setAnchorEl(null);
+    const openNotif = Boolean(anchorEl);
+
+    const handleProfileClick = (event) => setProfileAnchor(event.currentTarget);
+    const handleProfileClose = () => setProfileAnchor(null);
+    const handleLogout = () => {
+        handleProfileClose();
+        logout();
+        navigate('/login');
+    };
 
     const menuItems = [
-        { text: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/' },
-        { text: 'Surveillance', icon: <Video size={18} />, path: '/surveillance' },
-        { text: 'Intelligence', icon: <BarChart2 size={18} />, path: '/intelligence' },
-        { text: 'Archives', icon: <FileVideo size={18} />, path: '/archives' },
-        { text: 'Alerts', icon: <AlertCircle size={18} />, path: '/alerts' },
-        { text: 'System', icon: <Settings size={18} />, path: '/system' },
-    ];
+        { text: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/', roles: ['operator', 'admin'] },
+        { text: 'Admin Panel', icon: <ShieldAlert size={18} />, path: '/admin', roles: ['admin'] },
+        { text: 'Surveillance', icon: <Video size={18} />, path: '/surveillance', roles: ['operator', 'admin'] },
+        { text: 'Intelligence', icon: <BarChart2 size={18} />, path: '/intelligence', roles: ['operator', 'admin'] },
+        { text: 'Archives', icon: <FileVideo size={18} />, path: '/archives', roles: ['operator', 'admin'] },
+        { text: 'Alerts', icon: <AlertCircle size={18} />, path: '/alerts', roles: ['operator', 'admin'] },
+        { text: 'System', icon: <Settings size={18} />, path: '/system', roles: ['operator', 'admin'] },
+    ].filter(item => item.roles.includes(user?.role || 'operator'));
 
     return (
         <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
 
             {/* --- Level 1: Brand & Utilities Header --- */}
-            <AppBar position="static" elevation={0} sx={{ bgcolor: '#FFFFFF', borderBottom: `1px solid ${theme.palette.divider}` }}>
+            <AppBar
+                position="static"
+                elevation={0}
+                sx={{
+                    bgcolor: 'rgba(255, 255, 255, 0.85)',
+                    backdropFilter: 'blur(12px)',
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                    zIndex: (theme) => theme.zIndex.appBar
+                }}
+            >
                 <Container maxWidth="xl">
-                    <Toolbar disableGutters sx={{ height: 64 }}>
+                    <Toolbar disableGutters sx={{ height: 64, position: 'relative' }}>
 
-                        {/* Mobile Menu Icon */}
-                        <IconButton
-                            color="inherit"
-                            edge="start"
-                            onClick={() => setMobileOpen(true)}
-                            sx={{ mr: 2, display: { md: 'none' }, color: theme.palette.text.secondary }}
-                        >
-                            <Menu />
-                        </IconButton>
+                        {/* Left Section: Mobile Menu & Notifications */}
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <IconButton
+                                color="inherit"
+                                edge="start"
+                                onClick={() => setMobileOpen(true)}
+                                sx={{ mr: 1, display: { md: 'none' }, color: theme.palette.text.secondary }}
+                            >
+                                <Menu />
+                            </IconButton>
 
-                        {/* Branding */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mr: 4 }}>
-                            <Box sx={{
-                                width: 36,
-                                height: 36,
-                                bgcolor: theme.palette.primary.main,
-                                borderRadius: '10px', // Slightly rounded brand logo
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: `0 4px 10px ${theme.palette.action.hover}`
-                            }}>
-                                <ShieldCheck color="#fff" size={20} />
-                            </Box>
-                            <Box>
-                                <Typography variant="h6" sx={{ lineHeight: 1, color: theme.palette.text.primary, letterSpacing: '-0.01em' }}>
-                                    AURORA<span style={{ fontWeight: 400, opacity: 0.8 }}>SENTINEL</span>
+                            <Tooltip title="Notifications">
+                                <IconButton
+                                    size="small"
+                                    onClick={handleNotifClick}
+                                    sx={{
+                                        color: theme.palette.text.secondary,
+                                        mr: 2,
+                                        '&:hover': { color: theme.palette.primary.main }
+                                    }}
+                                >
+                                    <Badge badgeContent={notifications.length} color="error" variant="dot">
+                                        <Bell size={20} />
+                                    </Badge>
+                                </IconButton>
+                            </Tooltip>
+
+                            <Popover
+                                open={openNotif}
+                                anchorEl={anchorEl}
+                                onClose={handleNotifClose}
+                                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                                PaperProps={{
+                                    sx: { width: 320, mt: 1.5, borderRadius: 2, boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }
+                                }}
+                            >
+                                <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Notifications</Typography>
+                                    <Badge badgeContent={notifications.length} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 18, minWidth: 18 } }} />
+                                </Box>
+                                <List sx={{ p: 0, maxHeight: 400, overflow: 'auto' }}>
+                                    {notifications.map((n) => (
+                                        <MenuItem key={n.id} onClick={handleNotifClose} sx={{ py: 1.5, borderBottom: `1px solid ${theme.palette.divider}`, '&:last-child': { borderBottom: 0 } }}>
+                                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                                <Box sx={{
+                                                    p: 1,
+                                                    borderRadius: '50%',
+                                                    bgcolor: n.level === 'Critical' ? '#FEF2F2' : n.level === 'Warning' ? '#FFF7ED' : '#F0F9FF',
+                                                    display: 'flex'
+                                                }}>
+                                                    <AlertCircle size={16} color={n.level === 'Critical' ? '#EF4444' : n.level === 'Warning' ? '#F97316' : '#0EA5E9'} />
+                                                </Box>
+                                                <Box sx={{ flexGrow: 1 }}>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{n.title}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">{n.level} • {format(n.time, 'HH:mm')}</Typography>
+                                                </Box>
+                                            </Box>
+                                        </MenuItem>
+                                    ))}
+                                </List>
+                            </Popover>
+                        </Box>
+
+                        {/* Center Section: Branding */}
+                        <Box sx={{
+                            position: 'absolute',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            pointerEvents: 'none'
+                        }}>
+                            <Box
+                                component="img"
+                                src={logoImage}
+                                alt="Aurora Sentinel"
+                                sx={{ width: 40, height: 40, objectFit: 'contain', borderRadius: '8px' }}
+                            />
+                            <Box sx={{ pointerEvents: 'auto', cursor: 'pointer' }} onClick={() => navigate('/')}>
+                                <Typography variant="h6" sx={{
+                                    lineHeight: 1,
+                                    color: theme.palette.text.primary,
+                                    letterSpacing: '-0.02em',
+                                    fontWeight: 900,
+                                    fontSize: '1.2rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '2px'
+                                }}>
+                                    AURORA<span style={{ fontWeight: 400, color: theme.palette.primary.main }}>SENTINEL</span>
                                 </Typography>
                             </Box>
                         </Box>
 
-                        {/* Middle Spacer / Search Placeholder */}
-                        <Box sx={{ flexGrow: 1 }} />
-
-                        {/* Quick Actions */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Tooltip title="Search System">
-                                <IconButton size="small" sx={{ color: theme.palette.text.secondary }}>
-                                    <Search size={20} />
-                                </IconButton>
-                            </Tooltip>
-
-                            <Tooltip title="Notifications">
-                                <IconButton size="small" sx={{ color: theme.palette.text.secondary }}>
-                                    <Bell size={20} />
-                                </IconButton>
-                            </Tooltip>
-
-                            <Box sx={{ width: 1, height: 24, bgcolor: theme.palette.divider, mx: 1.5 }} />
+                        {/* Right Section: Profile */}
+                        <Box sx={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box sx={{ width: 1, height: 24, bgcolor: '#fafafa', mx: 1.5 }} />
 
                             <Button
                                 color="inherit"
-                                startIcon={<Avatar sx={{ width: 28, height: 28, bgcolor: theme.palette.secondary.main, fontSize: '0.8rem' }}>OP</Avatar>}
+                                onClick={handleProfileClick}
+                                startIcon={<Avatar sx={{ width: 32, height: 32, bgcolor: user?.role === 'admin' ? theme.palette.secondary.main : theme.palette.primary.main, fontSize: '0.9rem', fontWeight: 700 }}>{user?.role === 'admin' ? 'AD' : 'OP'}</Avatar>}
                                 endIcon={<ChevronDown size={16} />}
                                 sx={{
-                                    textTransform: 'none',
-                                    color: theme.palette.text.primary,
-                                    fontWeight: 600
+                                    textTransform: 'none', px: 1, py: 0.5, borderRadius: '12px', color: theme.palette.text.primary, fontWeight: 600,
+                                    '&:hover': { bgcolor: 'rgba(111, 143, 114, 0.08)' }
                                 }}
                             >
-                                Operator
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{user?.name || 'Operator'}</Typography>
+                                    <Badge
+                                        badgeContent={user?.id || 'OP-4921'}
+                                        sx={{
+                                            '& .MuiBadge-badge': {
+                                                bgcolor: user?.role === 'admin' ? theme.palette.secondary.main : theme.palette.primary.main,
+                                                color: 'white', fontSize: '0.65rem', height: 18, width: '4.31em', padding: '0 4px', fontWeight: 800, position: 'static', transform: 'none'
+                                            }
+                                        }}
+                                    />
+                                </Box>
                             </Button>
+
+                            <MuiMenu
+                                anchorEl={profileAnchor}
+                                open={Boolean(profileAnchor)}
+                                onClose={handleProfileClose}
+                                PaperProps={{ sx: { mt: 1, width: 200, borderRadius: 3, boxShadow: '0 10px 25px rgba(0,0,0,0.1)' } }}
+                            >
+                                <MenuItem onClick={() => { handleProfileClose(); navigate('/system'); }}>
+                                    <ListItemIcon><User size={18} /></ListItemIcon>
+                                    <ListItemText primary="Profile Settings" />
+                                </MenuItem>
+                                {user?.role === 'admin' && (
+                                    <MenuItem onClick={() => { handleProfileClose(); navigate('/admin'); }}>
+                                        <ListItemIcon><ShieldCheck size={18} /></ListItemIcon>
+                                        <ListItemText primary="Admin Panel" />
+                                    </MenuItem>
+                                )}
+                                <Box sx={{ my: 1, borderTop: `1px solid ${theme.palette.divider}` }} />
+                                <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
+                                    <ListItemIcon><LogOut size={18} color={theme.palette.error.main} /></ListItemIcon>
+                                    <ListItemText primary="Terminate Session" />
+                                </MenuItem>
+                            </MuiMenu>
                         </Box>
                     </Toolbar>
                 </Container>
