@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Box, AppBar, Toolbar, Typography, IconButton, Container, Button, useTheme, Avatar, Tooltip, Drawer, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
-import { Menu, LayoutDashboard, Video, BarChart2, AlertCircle, Settings, ShieldCheck, Bell, ChevronDown, LogOut, Search, FileVideo } from 'lucide-react';
+import { Box, AppBar, Toolbar, Typography, IconButton, Container, Button, useTheme, Avatar, Tooltip, Drawer, List, ListItem, ListItemIcon, ListItemText, Popover, Menu, MenuItem, Divider } from '@mui/material';
+import { Menu as MenuIcon, LayoutDashboard, Video, BarChart2, AlertCircle, Settings, ShieldCheck, Bell, ChevronDown, LogOut, FileVideo, User, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -9,6 +9,8 @@ const Layout = ({ children }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [notificationAnchor, setNotificationAnchor] = useState(null);
+    const [profileAnchor, setProfileAnchor] = useState(null);
 
     const menuItems = [
         { text: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/' },
@@ -18,6 +20,22 @@ const Layout = ({ children }) => {
         { text: 'Alerts', icon: <AlertCircle size={18} />, path: '/alerts' },
         { text: 'System', icon: <Settings size={18} />, path: '/system' },
     ];
+
+    const handleNotificationClick = (event) => {
+        setNotificationAnchor(event.currentTarget);
+    };
+
+    const handleNotificationClose = () => {
+        setNotificationAnchor(null);
+    };
+
+    const handleProfileClick = (event) => {
+        setProfileAnchor(event.currentTarget);
+    };
+
+    const handleProfileClose = () => {
+        setProfileAnchor(null);
+    };
 
     return (
         <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
@@ -34,23 +52,34 @@ const Layout = ({ children }) => {
                             onClick={() => setMobileOpen(true)}
                             sx={{ mr: 2, display: { md: 'none' }, color: theme.palette.text.secondary }}
                         >
-                            <Menu />
+                            <MenuIcon />
                         </IconButton>
 
                         {/* Branding */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mr: 4 }}>
-                            <Box sx={{
-                                width: 36,
-                                height: 36,
-                                bgcolor: theme.palette.primary.main,
-                                borderRadius: '10px', // Slightly rounded brand logo
+                        <Box
+                            onClick={() => navigate('/')}
+                            sx={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: `0 4px 10px ${theme.palette.action.hover}`
-                            }}>
-                                <ShieldCheck color="#fff" size={20} />
-                            </Box>
+                                gap: 1.5,
+                                mr: 4,
+                                cursor: 'pointer',
+                                '&:hover': {
+                                    opacity: 0.85
+                                },
+                                transition: 'opacity 0.2s ease'
+                            }}
+                        >
+                            <img
+                                src="/logo.jpeg"
+                                alt="Aurora Sentinel Logo"
+                                style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: '10px',
+                                    objectFit: 'cover'
+                                }}
+                            />
                             <Box>
                                 <Typography variant="h6" sx={{ lineHeight: 1, color: theme.palette.text.primary, letterSpacing: '-0.01em' }}>
                                     AURORA<span style={{ fontWeight: 400, opacity: 0.8 }}>SENTINEL</span>
@@ -63,32 +92,115 @@ const Layout = ({ children }) => {
 
                         {/* Quick Actions */}
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Tooltip title="Search System">
-                                <IconButton size="small" sx={{ color: theme.palette.text.secondary }}>
-                                    <Search size={20} />
-                                </IconButton>
-                            </Tooltip>
-
                             <Tooltip title="Notifications">
-                                <IconButton size="small" sx={{ color: theme.palette.text.secondary }}>
+                                <IconButton
+                                    size="small"
+                                    sx={{ color: theme.palette.text.secondary }}
+                                    onClick={handleNotificationClick}
+                                >
                                     <Bell size={20} />
                                 </IconButton>
                             </Tooltip>
 
-                            <Box sx={{ width: 1, height: 24, bgcolor: theme.palette.divider, mx: 1.5 }} />
+                            {/* Notification Popover */}
+                            <Popover
+                                open={Boolean(notificationAnchor)}
+                                anchorEl={notificationAnchor}
+                                onClose={handleNotificationClose}
+                                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                                PaperProps={{
+                                    sx: {
+                                        mt: 1.5,
+                                        borderRadius: 3,
+                                        minWidth: 280,
+                                        boxShadow: '0 10px 40px rgba(0,0,0,0.1)'
+                                    }
+                                }}
+                            >
+                                <Box sx={{ p: 2.5 }}>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Notifications</Typography>
+                                    <Divider sx={{ mb: 2 }} />
+                                    <Box sx={{
+                                        py: 4,
+                                        textAlign: 'center',
+                                        color: theme.palette.text.secondary
+                                    }}>
+                                        <Bell size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
+                                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                            No new notifications
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            </Popover>
 
                             <Button
                                 color="inherit"
-                                startIcon={<Avatar sx={{ width: 28, height: 28, bgcolor: theme.palette.secondary.main, fontSize: '0.8rem' }}>OP</Avatar>}
+                                startIcon={
+                                    <Avatar sx={{
+                                        width: 32,
+                                        height: 32,
+                                        background: 'linear-gradient(135deg, #6F8F72 0%, #4a6b4d 100%)',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 700,
+                                        letterSpacing: '0.05em',
+                                        boxShadow: '0 2px 8px rgba(111, 143, 114, 0.3)'
+                                    }}>
+                                        OP
+                                    </Avatar>
+                                }
                                 endIcon={<ChevronDown size={16} />}
+                                onClick={handleProfileClick}
                                 sx={{
                                     textTransform: 'none',
                                     color: theme.palette.text.primary,
-                                    fontWeight: 600
+                                    fontWeight: 600,
+                                    ml: 1,
+                                    px: 2,
+                                    py: 1,
+                                    borderRadius: 2,
+                                    '&:hover': {
+                                        bgcolor: 'rgba(111, 143, 114, 0.08)'
+                                    }
                                 }}
                             >
                                 Operator
                             </Button>
+
+                            {/* Profile Menu */}
+                            <Menu
+                                anchorEl={profileAnchor}
+                                open={Boolean(profileAnchor)}
+                                onClose={handleProfileClose}
+                                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                                PaperProps={{
+                                    sx: {
+                                        mt: 1.5,
+                                        borderRadius: 3,
+                                        minWidth: 200,
+                                        boxShadow: '0 10px 40px rgba(0,0,0,0.1)'
+                                    }
+                                }}
+                            >
+                                <Box sx={{ px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Operator</Typography>
+                                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>operator@aurora.local</Typography>
+                                </Box>
+                                <MenuItem onClick={handleProfileClose} sx={{ py: 1.5, gap: 1.5 }}>
+                                    <User size={18} />
+                                    <Typography variant="body2">Profile</Typography>
+                                </MenuItem>
+                                <MenuItem onClick={handleProfileClose} sx={{ py: 1.5, gap: 1.5 }}>
+                                    <Settings size={18} />
+                                    <Typography variant="body2">Settings</Typography>
+                                </MenuItem>
+                                <Divider />
+                                <MenuItem onClick={handleProfileClose} sx={{ py: 1.5, gap: 1.5, color: theme.palette.error.main }}>
+                                    <LogOut size={18} />
+                                    <Typography variant="body2">Logout</Typography>
+                                </MenuItem>
+                            </Menu>
                         </Box>
                     </Toolbar>
                 </Container>
@@ -186,7 +298,7 @@ const Layout = ({ children }) => {
                     </AnimatePresence>
                 </Container>
             </Box>
-        </Box>
+        </Box >
     );
 };
 

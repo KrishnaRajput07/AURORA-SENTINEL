@@ -180,7 +180,7 @@ const LiveFeed = () => {
             </Box>
 
             {/* Video Area */}
-            <Box sx={{ flexGrow: 1, position: 'relative', bgcolor: '#000', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflow: 'hidden' }}>
+            <Box sx={{ flexGrow: 1, position: 'relative', bgcolor: '#000', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflow: 'visible' }}>
 
                 {/* 1. Raw Video Element (Fallback logic improved) */}
                 <video
@@ -195,7 +195,7 @@ const LiveFeed = () => {
                         display: (isOfflineMode || !processedImageSrc) ? 'block' : 'none',
                         width: '100%',
                         height: 'auto',
-                        maxHeight: '100%',
+                        maxHeight: 'calc(100% - 72px)',
                         objectFit: 'contain'
                     }}
                 />
@@ -205,7 +205,7 @@ const LiveFeed = () => {
 
                 {/* 3. Processed Feed (Visible only if valid source) */}
                 {processedImageSrc && isConnected && !cameraError && (
-                    <img src={processedImageSrc} alt="Stream" style={{ width: '100%', height: 'auto', maxHeight: '100%', objectFit: 'contain' }} />
+                    <img src={processedImageSrc} alt="Stream" style={{ width: '100%', height: 'auto', maxHeight: 'calc(100% - 72px)', objectFit: 'contain' }} />
                 )}
 
                 {/* Status Overlay: Connection Wait */}
@@ -219,7 +219,7 @@ const LiveFeed = () => {
                 {/* HUD Overlay - PREMIUM HIGH-TECH DESIGN */}
                 <Box sx={{
                     position: 'absolute',
-                    bottom: 0,
+                    bottom: 35,
                     left: 0,
                     right: 0,
                     height: 72,
@@ -321,3 +321,4 @@ const LiveFeed = () => {
 };
 
 export default LiveFeed;
+
