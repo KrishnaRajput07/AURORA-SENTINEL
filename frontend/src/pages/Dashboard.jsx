@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Grid, Typography, Paper, Box, useTheme, Chip } from '@mui/material';
+import { Grid, Typography, Paper, Box, useTheme, Chip, IconButton } from '@mui/material';
 import RiskHeatmap from '../components/RiskHeatmap';
 import AlertQueue from '../components/AlertQueue';
 import LiveFeed from '../components/LiveFeed';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import { motion } from 'framer-motion';
-import { Activity, Radio, ShieldAlert } from 'lucide-react';
+import { Activity, Shield, AlertTriangle, MoreHorizontal } from 'lucide-react';
 
 const Dashboard = () => {
     const [alerts, setAlerts] = useState([]);
     const [riskData, setRiskData] = useState(null);
-    const muiTheme = useTheme();
+    const theme = useTheme();
 
     useEffect(() => {
         fetchAlerts();
@@ -24,22 +24,18 @@ const Dashboard = () => {
 
     const fetchAlerts = async () => {
         try {
-            const response = await fetch('http://localhost:8000/alerts/recent');
+            const response = await fetch('http://localhost:8001/alerts/recent');
             const data = await response.json();
             setAlerts(data.alerts);
-        } catch (error) {
-            console.error('Error fetching alerts:', error);
-        }
+        } catch (error) { console.error('Error fetching alerts:', error); }
     };
 
     const fetchRiskData = async () => {
         try {
-            const response = await fetch('http://localhost:8000/analytics/dashboard');
+            const response = await fetch('http://localhost:8001/analytics/dashboard');
             const data = await response.json();
             setRiskData(data);
-        } catch (error) {
-            console.error('Error fetching risk data:', error);
-        }
+        } catch (error) { console.error('Error fetching risk data:', error); }
     };
 
     const cardVariants = {
@@ -48,41 +44,48 @@ const Dashboard = () => {
     };
 
     return (
-        <Grid container spacing={3}>
+        <Grid container spacing={4}>
+            {/* Header Area */}
+            <Grid item xs={12}>
+                <Box sx={{ mb: 1 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.text.primary, mb: 1 }}>
+                        Overview
+                    </Typography>
+                    <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
+                        Live monitoring and safety analytics.
+                    </Typography>
+                </Box>
+            </Grid>
+
             {/* Top Row: Map and Live Feed */}
             <Grid item xs={12} lg={8}>
                 <motion.div variants={cardVariants} initial="hidden" animate="visible">
                     <Paper sx={{
                         p: 0,
-                        height: 500,
-                        overflow: 'hidden',
+                        height: 400,
                         display: 'flex',
                         flexDirection: 'column',
-                        position: 'relative'
+                        overflow: 'hidden'
                     }}>
+                        {/* Clean Header */}
                         <Box sx={{
-                            p: 2,
-                            borderBottom: `1px solid ${muiTheme.palette.divider}`,
-                            background: muiTheme.palette.action.hover,
+                            py: 2,
+                            px: 3,
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center'
+                            alignItems: 'center',
                         }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                <Activity size={20} color={muiTheme.palette.primary.main} />
-                                <Typography variant="h6" color="text.primary">
-                                    City Surveillance Grid
+                                <Box sx={{ p: 1, bgcolor: '#F0FDF4', borderRadius: '50%' }}> {/* Soft green bg */}
+                                    <Activity size={20} color={theme.palette.primary.main} />
+                                </Box>
+                                <Typography variant="h6" sx={{ fontSize: '1rem', color: theme.palette.text.primary }}>
+                                    Live Activity Map
                                 </Typography>
                             </Box>
-                            <Chip
-                                icon={<Radio size={14} />}
-                                label="LIVE ACTIVITY"
-                                color="success"
-                                size="small"
-                                variant="outlined"
-                                sx={{ fontWeight: 600 }}
-                            />
+                            <Chip label="Active" size="small" color="success" sx={{ height: 24, fontSize: '0.75rem' }} />
                         </Box>
+
                         <Box sx={{ flexGrow: 1, position: 'relative' }}>
                             <RiskHeatmap alerts={alerts} />
                         </Box>
@@ -92,20 +95,22 @@ const Dashboard = () => {
 
             <Grid item xs={12} lg={4}>
                 <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
-                    <Paper sx={{ p: 0, height: 500, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <Paper sx={{ p: 0, height: 400, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                         <Box sx={{
-                            p: 2,
-                            borderBottom: `1px solid ${muiTheme.palette.divider}`,
+                            py: 1,
+                            px: 2.5,
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 1.5
+                            gap: 1.25,
                         }}>
-                            <ShieldAlert size={20} color={muiTheme.palette.secondary.main} />
-                            <Typography variant="h6" color="text.primary">
-                                Target Feed
+                            <Box sx={{ p: 0.75, bgcolor: '#FFF7ED', borderRadius: '50%' }}> {/* Soft orange bg */}
+                                <Shield size={16} color={theme.palette.secondary.main} />
+                            </Box>
+                            <Typography variant="h6" sx={{ fontSize: '0.9rem', color: theme.palette.text.primary, fontWeight: 700 }}>
+                                Camera Feed
                             </Typography>
                         </Box>
-                        <Box sx={{ flexGrow: 1 }}>
+                        <Box sx={{ flexGrow: 1, bgcolor: '#000', position: 'relative' }}>
                             <LiveFeed />
                         </Box>
                     </Paper>
@@ -124,17 +129,23 @@ const Dashboard = () => {
                 <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.4 }}>
                     <Paper sx={{ p: 0, overflow: 'hidden' }}>
                         <Box sx={{
-                            p: 2,
-                            borderBottom: `1px solid ${muiTheme.palette.divider}`,
+                            p: 3,
+                            borderBottom: `1px solid ${theme.palette.divider}`,
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 1.5
+                            justifyContent: 'space-between'
                         }}>
-                            <Typography variant="h6" color="error.main">
-                                Threat Log
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <Box sx={{ p: 1, bgcolor: '#FEF2F2', borderRadius: '50%' }}> {/* Soft red bg */}
+                                    <AlertTriangle size={20} color={theme.palette.error.main} />
+                                </Box>
+                                <Typography variant="h6" sx={{ fontSize: '1rem', color: theme.palette.text.primary }}>
+                                    Recent Alerts
+                                </Typography>
+                            </Box>
+                            <IconButton size="small"><MoreHorizontal size={20} /></IconButton>
                         </Box>
-                        <Box sx={{ p: 2 }}>
+                        <Box sx={{ p: 0 }}>
                             <AlertQueue alerts={alerts} onAcknowledge={fetchAlerts} />
                         </Box>
                     </Paper>

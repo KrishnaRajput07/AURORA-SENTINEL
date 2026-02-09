@@ -9,23 +9,26 @@ import DemoAnalysis from './pages/DemoAnalysis';
 import AlertsPage from './pages/Alerts';
 import AnalyticsPage from './pages/Analytics';
 import SystemPage from './pages/System';
+import Intelligence from './pages/Intelligence';
+import ArchivesPage from './pages/Archives';
+import NetworkStatusIndicator from './components/NetworkStatusIndicator';
 
 function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
-            <Router>
-                <Layout>
-                    <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/surveillance" element={<LiveSurveillance />} />
-                        <Route path="/demo" element={<DemoAnalysis />} />
-                        <Route path="/alerts" element={<AlertsPage />} />
-                        <Route path="/analytics" element={<AnalyticsPage />} />
-                        <Route path="/system" element={<SystemPage />} />
-                    </Routes>
-                </Layout>
-            </Router>
+            <NetworkStatusIndicator />
+            <Layout>
+                <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/surveillance" element={<LiveSurveillance />} />
+                    <Route path="/intelligence" element={<Intelligence />} />
+                    <Route path="/archives" element={<ArchivesPage />} />
+                    <Route path="/alerts" element={<AlertsPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/system" element={<SystemPage />} />
+                </Routes>
+            </Layout>
         </ThemeProvider>
     );
 }

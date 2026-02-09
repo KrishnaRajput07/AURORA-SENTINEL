@@ -1,0 +1,56 @@
+/* Google Fonts Import */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-main: #E8E2D8;
+  --bg-paper: #FFFFFF;
+  --primary: #6F8F72;
+  --secondary: #F2A65A;
+  --neutral: #BFC6C4;
+  --text-main: #2C3333;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar - Matching Palette */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--neutral);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Helper Classes */
+.text-sage {
+  color: var(--primary) !important;
+}
+
+.text-terracotta {
+  color: var(--secondary) !important;
+}
+
+/* Transition smoothness */
+a,
+button,
+.MuiPaper-root {
+  transition: all 0.2s ease-in-out;
+}

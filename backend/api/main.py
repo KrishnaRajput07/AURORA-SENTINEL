@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db.database import engine, Base
-from backend.api.routers import alerts, analytics, video, stream
+from backend.api.routers import alerts, analytics, video, stream, archive
 from backend.services.ml_service import ml_service
 import os
 
@@ -14,7 +14,12 @@ app = FastAPI(title="AURORA-SENTINEL API", version="2.0.0")
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,8 +30,7 @@ app.add_middleware(
 async def startup_event():
     ml_service.load_models()
 
-# Include Routers
-from backend.api.routers import alerts, analytics, video, stream
+# Routers are included below using 'app.include_router'
 
 # ... imports ...
 
@@ -35,6 +39,7 @@ app.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
 app.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
 app.include_router(stream.router, prefix="/ws", tags=["Live Stream"]) # Mounts at /ws/live-feed
 app.include_router(video.router, tags=["Video Processing"]) # Mounts at /process/video (explicit in router)
+app.include_router(archive.router, prefix="/archive", tags=["Archive"])
 
 
 @app.get("/")

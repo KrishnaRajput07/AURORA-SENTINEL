@@ -7,7 +7,7 @@ class UnifiedDetector:
     """
     Combines object detection and pose estimation with ByteTrack
     """
-    def __init__(self, device='cuda' if torch.cuda.is_available() else 'cpu'):
+    def __init__(self, device='cpu'):
         self.device = device
         print(f"Initializing UnifiedDetector on {self.device}...")
         
@@ -43,10 +43,13 @@ class UnifiedDetector:
         """
         # Enable tracking with ByteTrack
         # persist=True is crucial for ID consistency across frames
-        results = self.object_model.track(
+        # Enable tracking with ByteTrack
+        # persist=True is crucial for ID consistency across frames
+        # CRASH FIX: use predict() instead of track() on Windows CPU to avoid LAP/tracker crashes
+        results = self.object_model.predict(
             frame, 
-            persist=True, 
-            tracker="bytetrack.yaml", 
+            # persist=True, 
+            # tracker="bytetrack.yaml", 
             verbose=False, 
             device=self.device,
             classes=list(self.critical_objects.keys()) # Filter classes early if possible
