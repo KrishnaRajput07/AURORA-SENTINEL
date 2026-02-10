@@ -28,7 +28,7 @@ async def get_recent_alerts(limit: int = 50, status: Optional[str] = None, db: S
         # Default: Show non-resolved (Active)
         query = query.filter(Alert.status != "resolved")
         
-    alerts = query.order_by(Alert.risk_score.desc(), Alert.timestamp.desc()).limit(limit).all()
+    alerts = query.order_by(Alert.timestamp.desc(), Alert.risk_score.desc()).limit(limit).all()
     
     return {
         "count": len(alerts),
@@ -81,7 +81,7 @@ async def resolve_alert(alert_id: int, req: ResolveRequest, db: Session = Depend
     return {"status": "success", "alert": alert_to_dict(alert)}
 
 def alert_to_dict(alert: Alert):
-    return {
+    data = {
         "id": alert.id,
         "timestamp": alert.timestamp.isoformat(),
         "level": alert.level,
@@ -89,10 +89,19 @@ def alert_to_dict(alert: Alert):
         "camera_id": alert.camera_id,
         "location": alert.location,
         "status": alert.status,
-        "risk_factors": alert.risk_factors,
         "operator_name": alert.operator_name,
         "resolution_type": alert.resolution_type,
         "resolution_notes": alert.resolution_notes,
         "acknowledged_at": alert.acknowledged_at.isoformat() if alert.acknowledged_at else None,
-        "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at else None
+        "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at else None,
+        "video_clip_path": alert.video_clip_path
     }
+    
+    # Flatten risk_factors for frontend compatibility
+    if alert.risk_factors:
+        if isinstance(alert.risk_factors, dict):
+            data.update(alert.risk_factors)
+        else:
+            data["risk_factors"] = alert.risk_factors
+            
+    return data

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Grid, Card, CardContent, CardMedia, IconButton, Tab, Tabs, alpha, useTheme, Button, CircularProgress } from '@mui/material';
-import { Play, Trash2, Download, FileVideo, Clock, RefreshCw, HardDrive } from 'lucide-react';
+import { Box, Typography, Grid, Card, CardContent, CardMedia, IconButton, Tab, Tabs, alpha, useTheme, Button, CircularProgress, Dialog } from '@mui/material';
+import { Play, Trash2, Download, FileVideo, Clock, RefreshCw, HardDrive, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 const ArchiveGallery = () => {
     const [clips, setClips] = useState([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState('active');
+    const [selectedClip, setSelectedClip] = useState(null);
     const theme = useTheme();
 
     useEffect(() => {
@@ -143,6 +144,7 @@ const ArchiveGallery = () => {
                                                 variant="contained"
                                                 size="small"
                                                 startIcon={<Play size={14} />}
+                                                onClick={() => setSelectedClip(clip)}
                                                 sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
                                             >
                                                 View
@@ -162,6 +164,39 @@ const ArchiveGallery = () => {
                     </Grid>
                 )}
             </Box>
+            {/* Video Player Dialog */}
+            <Dialog
+                open={!!selectedClip}
+                onClose={() => setSelectedClip(null)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{ sx: { bgcolor: '#000', borderRadius: 4, overflow: 'hidden' } }}
+            >
+                <Box sx={{ position: 'relative', pt: '56.25%', bgcolor: '#000' }}>
+                    {selectedClip && (
+                        <video
+                            src={`http://localhost:8000${selectedClip.url}`}
+                            controls
+                            autoPlay
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                        />
+                    )}
+                    <IconButton
+                        onClick={() => setSelectedClip(null)}
+                        sx={{ position: 'absolute', top: 12, right: 12, color: '#fff', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }}
+                    >
+                        <X size={20} />
+                    </IconButton>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#111', borderTop: '1px solid #333' }}>
+                    <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 800 }}>
+                        {selectedClip?.name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                        Archived: {selectedClip && format(new Date(selectedClip.created_at), 'PPPP p')}
+                    </Typography>
+                </Box>
+            </Dialog>
         </Box>
     );
 };

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Box, Typography, Grid, Paper, Tabs, Tab, Button, List, ListItem, Chip, IconButton, useTheme, alpha, Switch, FormControlLabel, TextField, Avatar } from '@mui/material';
-import { Shield, Users, Bell, Settings, FileText, CheckCircle, XCircle, UserPlus, Trash2, Camera, AlertCircle, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Grid, Paper, Tabs, Tab, Button, List, ListItem, Chip, IconButton, useTheme, alpha, Switch, FormControlLabel, TextField, Avatar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Alert, CircularProgress } from '@mui/material';
+import { Shield, Users, Bell, Settings, FileText, CheckCircle, XCircle, UserPlus, Trash2, Camera, AlertCircle, Save, Activity, HardDrive, Cpu, Zap, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import logoImage from '../assets/logo.png';
 
 const AdminDashboard = () => {
     const theme = useTheme();
@@ -17,6 +18,57 @@ const AdminDashboard = () => {
         { id: 'OP-5502', name: 'Sarah Miller', status: 'Active', shifts: 'Evening' }
     ]);
 
+    const [auditHistory, setAuditHistory] = useState([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
+
+    const [maintenanceMode, setMaintenanceMode] = useState(false);
+    const [systemMetrics, setSystemMetrics] = useState({
+        cpu: 42,
+        gpu: 68,
+        ram: 54,
+        latency: 125
+    });
+
+    const [openAddOp, setOpenAddOp] = useState(false);
+    const [newOp, setNewOp] = useState({ id: `OP-${Math.floor(Math.random() * 9000) + 1000}`, name: '', shifts: 'Morning' });
+    const [isExporting, setIsExporting] = useState(false);
+    const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
+
+    const handleExportReport = () => {
+        setIsExporting(true);
+        setTimeout(() => {
+            setIsExporting(false);
+            setNotification({ open: true, message: 'Global Security Report exported successfully!', severity: 'success' });
+        }, 2000);
+    };
+
+    const handleAddOperator = () => {
+        if (!newOp.name) return;
+        setOperators([...operators, { ...newOp, status: 'Active' }]);
+        setOpenAddOp(false);
+        setNewOp({ id: `OP-${Math.floor(Math.random() * 9000) + 1000}`, name: '', shifts: 'Morning' });
+        setNotification({ open: true, message: 'New operator added to roster.', severity: 'success' });
+    };
+
+    const fetchAuditHistory = async () => {
+        setLoadingLogs(true);
+        try {
+            const response = await fetch('http://localhost:8000/alerts/history?limit=50');
+            const data = await response.json();
+            setAuditHistory(data.alerts);
+        } catch (error) {
+            console.error('Error fetching audit history:', error);
+        } finally {
+            setLoadingLogs(false);
+        }
+    };
+
+    useEffect(() => {
+        if (tab === 2) {
+            fetchAuditHistory();
+        }
+    }, [tab]);
+
     const handleAcknowledge = (id) => {
         setAlerts(alerts.map(a => a.id === id ? { ...a, status: 'Acknowledged' } : a));
     };
@@ -25,20 +77,100 @@ const AdminDashboard = () => {
         setAlerts(alerts.map(a => a.id === id ? { ...a, status: 'Resolved' } : a));
     };
 
+    const AuditLogsTable = () => (
+        <Paper variant="outlined" sx={{ width: '100%', overflow: 'hidden', borderRadius: 4 }}>
+            <TableContainer>
+                <Table size="small">
+                    <TableHead sx={{ bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
+                        <TableRow>
+                            <TableCell sx={{ fontWeight: 800, color: theme.palette.text.primary }}>TIMESTAMP</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: theme.palette.text.primary }}>ACTION</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: theme.palette.text.primary }}>OPERATOR</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: theme.palette.text.primary }}>RESOLUTION / NOTES</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {loadingLogs ? (
+                            <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4 }}><Typography variant="body2" color="text.secondary">Fetching secure archives...</Typography></TableCell></TableRow>
+                        ) : auditHistory.length === 0 ? (
+                            <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4 }}><Typography variant="body2" color="text.secondary">No historical activity recorded yet.</Typography></TableCell></TableRow>
+                        ) : auditHistory.map((row, i) => (
+                            <TableRow key={i} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                                <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                                    {new Date(row.resolved_at).toLocaleTimeString()}
+                                </TableCell>
+                                <TableCell>
+                                    <Chip
+                                        label="RESOLVED"
+                                        size="small"
+                                        sx={{
+                                            fontWeight: 800,
+                                            fontSize: '0.65rem',
+                                            bgcolor: alpha(theme.palette.success.main, 0.1),
+                                            color: theme.palette.success.main
+                                        }}
+                                    />
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>{row.operator_name || 'System'}</TableCell>
+                                <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 500 }}>
+                                    <Typography variant="body2" component="span" sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>{row.resolution_type}:</Typography> {row.resolution_notes || 'No notes provided'}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </Paper>
+    );
+
+    const ResourceMonitor = () => (
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+            {[
+                { label: 'CPU Load', value: `${systemMetrics.cpu}%`, icon: <Cpu />, color: theme.palette.primary.main },
+                { label: 'GPU Usage', value: `${systemMetrics.gpu}%`, icon: <Zap />, color: theme.palette.secondary.main },
+                { label: 'Memory', value: `${systemMetrics.ram}%`, icon: <HardDrive />, color: '#805AD5' },
+                { label: 'Latency', value: `${systemMetrics.latency}ms`, icon: <Activity />, color: theme.palette.error.main },
+            ].map((m, i) => (
+                <Grid item xs={6} md={3} key={i}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(m.color, 0.1), color: m.color }}>{m.icon}</Box>
+                        <Box>
+                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700 }}>{m.label}</Typography>
+                            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1 }}>{m.value}</Typography>
+                        </Box>
+                    </Paper>
+                </Grid>
+            ))}
+        </Grid>
+    );
+
     return (
         <Box sx={{ pb: 8 }}>
             {/* Header Section */}
             <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                <Box>
-                    <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-0.04em', display: 'flex', alignItems: 'center', gap: 2 }}>
-                        Admin <Box sx={{ px: 1.5, py: 0.5, bgcolor: theme.palette.primary.main, color: '#fff', borderRadius: 2, fontSize: '0.9rem', fontWeight: 900 }}>MANAGEMENT</Box>
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: theme.palette.text.secondary, mt: 1, fontWeight: 500 }}>
-                        System-wide oversight, user management, and security configuration.
-                    </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+                    <Box
+                        component="img"
+                        src={logoImage}
+                        sx={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 3, bgcolor: '#fff', p: 0.5, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+                    />
+                    <Box>
+                        <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-0.04em', display: 'flex', alignItems: 'center', gap: 2 }}>
+                            Admin <Box sx={{ px: 1.5, py: 0.5, bgcolor: theme.palette.primary.main, color: '#fff', borderRadius: 2, fontSize: '0.9rem', fontWeight: 900 }}>MANAGEMENT</Box>
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: theme.palette.text.secondary, mt: 0.5, fontWeight: 500 }}>
+                            System-wide oversight, user management, and security configuration.
+                        </Typography>
+                    </Box>
                 </Box>
-                <Button variant="contained" startIcon={<FileText size={18} />} sx={{ borderRadius: 3, px: 4, py: 1.5, fontWeight: 800 }}>
-                    Export Global Report
+                <Button
+                    variant="contained"
+                    startIcon={isExporting ? <CircularProgress size={18} color="inherit" /> : <FileText size={18} />}
+                    disabled={isExporting}
+                    onClick={handleExportReport}
+                    sx={{ borderRadius: 3, px: 4, py: 1.5, fontWeight: 800 }}
+                >
+                    {isExporting ? 'Exporting...' : 'Export Global Report'}
                 </Button>
             </Box>
 
@@ -53,9 +185,10 @@ const AdminDashboard = () => {
                         '& .Mui-selected': { color: theme.palette.primary.main }
                     }}
                 >
-                    <Tab icon={<Bell size={18} />} label="Alert Management" />
-                    <Tab icon={<Users size={18} />} label="User Management" />
-                    <Tab icon={<Settings size={18} />} label="System Config" />
+                    <Tab icon={<Bell size={18} />} label="Alert Queue" />
+                    <Tab icon={<Users size={18} />} label="Operators" />
+                    <Tab icon={<FileText size={18} />} label="Audit Logs" />
+                    <Tab icon={<Settings size={18} />} label="System Pulse" />
                 </Tabs>
 
                 <Box sx={{ p: 4 }}>
@@ -103,7 +236,14 @@ const AdminDashboard = () => {
                         <Box sx={{ animation: 'fadeIn 0.4s ease-out' }}>
                             <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800 }}>Active Personnel</Typography>
-                                <Button variant="contained" startIcon={<UserPlus size={18} />} sx={{ borderRadius: 3 }}>Add New Operator</Button>
+                                <Button
+                                    variant="contained"
+                                    startIcon={<UserPlus size={18} />}
+                                    onClick={() => setOpenAddOp(true)}
+                                    sx={{ borderRadius: 3 }}
+                                >
+                                    Add New Operator
+                                </Button>
                             </Box>
                             <Grid container spacing={3}>
                                 {operators.map(op => (
@@ -124,31 +264,43 @@ const AdminDashboard = () => {
                         </Box>
                     )}
 
-                    {/* Tab 2: System Config */}
+                    {/* Tab 2: Audit Logs */}
                     {tab === 2 && (
                         <Box sx={{ animation: 'fadeIn 0.4s ease-out' }}>
-                            <Typography variant="h6" sx={{ fontWeight: 800, mb: 4 }}>Global Security Parameters</Typography>
+                            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="h6" sx={{ fontWeight: 800 }}>Security Audit History</Typography>
+                                <Button size="small" variant="text" sx={{ fontWeight: 700 }}>Clear History</Button>
+                            </Box>
+                            <AuditLogsTable />
+                        </Box>
+                    )}
+
+                    {/* Tab 3: System Config / Pulse */}
+                    {tab === 3 && (
+                        <Box sx={{ animation: 'fadeIn 0.4s ease-out' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 800, mb: 3 }}>Real-time System Performance</Typography>
+                            <ResourceMonitor />
+
+                            <Typography variant="h6" sx={{ fontWeight: 800, mb: 3 }}>Master Control Panel</Typography>
                             <Grid container spacing={4}>
                                 <Grid item xs={12} md={6}>
                                     <Paper variant="outlined" sx={{ p: 4, borderRadius: 5, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 800, borderBottom: `1px solid ${theme.palette.divider}`, pb: 1 }}>Detection Sensitivity</Typography>
-                                        <FormControlLabel control={<Switch defaultChecked />} label="Enable Aggression Pose Tracking" />
-                                        <FormControlLabel control={<Switch />} label="Strict Crowd Density Alerts" />
-                                        <TextField label="Loitering Threshold (seconds)" defaultValue="30" type="number" fullWidth />
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 800, borderBottom: `1px solid ${theme.palette.divider}`, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Lock size={18} /> Master Overrides
+                                        </Typography>
+                                        <FormControlLabel
+                                            control={<Switch checked={maintenanceMode} onChange={(e) => setMaintenanceMode(e.target.checked)} color="warning" />}
+                                            label={<Box><Typography variant="body1" sx={{ fontWeight: 700 }}>Maintenance Mode</Typography><Typography variant="caption" color="text.secondary">Locks all operator actions and shows maintenance screen</Typography></Box>}
+                                        />
+                                        <FormControlLabel control={<Switch defaultChecked />} label={<Box><Typography variant="body1" sx={{ fontWeight: 700 }}>Global AI Thresholding</Typography><Typography variant="caption" color="text.secondary">Auto-adjust sensitivity based on system load</Typography></Box>} />
                                     </Paper>
                                 </Grid>
                                 <Grid item xs={12} md={6}>
                                     <Paper variant="outlined" sx={{ p: 4, borderRadius: 5, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 800, borderBottom: `1px solid ${theme.palette.divider}`, pb: 1 }}>Infrastructure</Typography>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                            <Camera size={20} />
-                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>Main Gate North (ID: CAM-001) - ONLINE</Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                            <Camera size={20} />
-                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>Lobby Area (ID: CAM-004) - ONLINE</Typography>
-                                        </Box>
-                                        <Button variant="contained" startIcon={<Save size={18} />} sx={{ mt: 2, borderRadius: 3 }}>Apply All Changes</Button>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 800, borderBottom: `1px solid ${theme.palette.divider}`, pb: 1 }}>Incident Thresholds</Typography>
+                                        <TextField label="Loitering Detection (secs)" defaultValue="30" type="number" fullWidth variant="filled" />
+                                        <TextField label="Crowd Density (%)" defaultValue="75" type="number" fullWidth variant="filled" />
+                                        <Button variant="contained" startIcon={<Save size={18} />} sx={{ mt: 2, borderRadius: 3, py: 1.5, fontWeight: 800 }}>Apply Master Settings</Button>
                                     </Paper>
                                 </Grid>
                             </Grid>
@@ -156,6 +308,56 @@ const AdminDashboard = () => {
                     )}
                 </Box>
             </Paper>
+
+            {/* Add Operator Dialog */}
+            <Dialog open={openAddOp} onClose={() => setOpenAddOp(false)} PaperProps={{ sx: { borderRadius: 4, p: 1 } }}>
+                <DialogTitle sx={{ fontWeight: 900 }}>Enlist New Personnel</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
+                        <TextField
+                            label="Operator Name"
+                            fullWidth
+                            autoFocus
+                            value={newOp.name}
+                            onChange={(e) => setNewOp({ ...newOp, name: e.target.value })}
+                        />
+                        <TextField
+                            label="Operator ID"
+                            fullWidth
+                            value={newOp.id}
+                            disabled
+                        />
+                        <TextField
+                            select
+                            label="Shift Assignment"
+                            fullWidth
+                            SelectProps={{ native: true }}
+                            value={newOp.shifts}
+                            onChange={(e) => setNewOp({ ...newOp, shifts: e.target.value })}
+                        >
+                            <option value="Morning">Morning (06:00 - 14:00)</option>
+                            <option value="Evening">Evening (14:00 - 22:00)</option>
+                            <option value="Night">Night (22:00 - 06:00)</option>
+                        </TextField>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setOpenAddOp(false)} color="inherit" sx={{ fontWeight: 700 }}>Cancel</Button>
+                    <Button onClick={handleAddOperator} variant="contained" sx={{ fontWeight: 700, borderRadius: 2 }}>Enlist Operator</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Notification Snackbar */}
+            <Snackbar
+                open={notification.open}
+                autoHideDuration={4000}
+                onClose={() => setNotification({ ...notification, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert severity={notification.severity} sx={{ borderRadius: 3, fontWeight: 700 }}>
+                    {notification.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

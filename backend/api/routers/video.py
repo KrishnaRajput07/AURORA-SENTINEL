@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from datetime import datetime
 import tempfile
+import shutil
 from backend.services.ml_service import ml_service
 from models.scoring.risk_engine import RiskScoringEngine
 from backend.db.database import SessionLocal
@@ -31,8 +32,8 @@ async def process_video_file_task(video_path: str):
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
     
     # Initialize a FRESH local engine for this specific forensic analysis
-    # This prevents using live feed calibration or history
-    video_engine = RiskScoringEngine(fps=fps)
+    # Use bypass_calibration=True for forensic analysis to get results immediately
+    video_engine = RiskScoringEngine(fps=fps, bypass_calibration=True)
     
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
@@ -62,13 +63,13 @@ async def process_video_file_task(video_path: str):
             if frame_count % 6 == 0:
                 det = ml_service.detector.process_frame(frame)
                 timestamp = frame_count / fps
-                risk, facts = ml_service.risk_engine.calculate_risk(det, {
+                risk, facts = video_engine.calculate_risk(det, {
                     'hour': datetime.now().hour,
                     'timestamp': timestamp
                 })
                 
                 # Detect motion patterns
-                patterns = ml_service.risk_engine.detect_motion_patterns(det['poses'])
+                patterns = video_engine.detect_motion_patterns(det['poses'])
                 for pattern in patterns:
                     motion_patterns_set.add(pattern)
                 
@@ -78,8 +79,9 @@ async def process_video_file_task(video_path: str):
                 for p in det['poses']:
                     draw_skeleton(frame, np.array(p['keypoints']), np.array(p['confidence']))
                 
-                if risk > 35:
-                    alt = ml_service.risk_engine.generate_alert(risk, facts)
+                if risk > 20: # Lowered threshold for internal metrics to ensure visibility
+                    alt = video_engine.generate_alert(risk, facts)
+                    alt['level'] = alt['level'].upper() # Standardize
                     alt['timestamp_seconds'] = frame_count / fps
                     alerts.append(alt)
                 max_p = max(max_p, len(det['poses']))
@@ -98,6 +100,7 @@ async def process_video_file_task(video_path: str):
     
     return {
         "alerts": alerts,
+        "alerts_found": len(alerts),
         "processed_url": f"/archive/download/{out_name}?source=processed",
         "metrics": {
             "max_persons": max_p,
@@ -110,15 +113,70 @@ async def process_video_file_task(video_path: str):
 async def process_video(file: UploadFile = File(...)):
     try:
         os.makedirs("storage/temp", exist_ok=True)
-        fd, v_path = tempfile.mkstemp(suffix=f"_{file.filename}", dir="storage/temp")
-        os.close(fd)
-        with open(v_path, "wb") as b: b.write(await file.read())
+        # Use a stable path instead of tempfile to avoid handle/permission issues on Windows
+        safe_filename = file.filename.replace(" ", "_").replace("(", "").replace(")", "")
+        v_path = os.path.abspath(os.path.join("storage", "temp", f"raw_{datetime.now().timestamp()}_{safe_filename}"))
         
+        with open(v_path, "wb") as b: 
+            content = await file.read()
+            b.write(content)
+        
+        print(f"DEBUG: Processing video at {v_path}")
         results = await process_video_file_task(v_path)
+        
+        # PERSISTENCE & SMART BIN
+        print(f"DEBUG: Alerts found: {results.get('alerts_found', 0)}")
+        if results.get("alerts_found", 0) > 0:
+            peak_alert = max(results["alerts"], key=lambda x: x['score'])
+            print(f"DEBUG: Peak Score detected: {peak_alert['score']}%")
+            if peak_alert['score'] >= 30: # Use >= 30 as requested
+                try:
+                    db = SessionLocal()
+                    factors = {
+                        'is_forensic': True,
+                        'peak_score': peak_alert['score'],
+                        'top_factors': peak_alert.get('top_factors', []),
+                        'all_detections': results["alerts"],
+                        'total_events': len(results["alerts"])
+                    }
+                    
+                    new_alert = Alert(
+                        level=peak_alert['level'].upper(),
+                        risk_score=float(peak_alert['score']),
+                        camera_id="FORENSIC-01",
+                        location=f"Forensic: {file.filename}",
+                        risk_factors=factors,
+                        status="pending",
+                        timestamp=datetime.utcnow(),
+                        video_clip_path=results["processed_url"]
+                    )
+                    db.add(new_alert)
+                    db.commit()
+                    db.refresh(new_alert)
+                    db.close()
+                    print(f"SUCCESS: Forensic Alert Persisted. ID: {new_alert.id}")
+                    
+                    # SMART BIN: Move to secure storage
+                    bin_dir = os.path.abspath(os.path.join("storage", "bin"))
+                    os.makedirs(bin_dir, exist_ok=True)
+                    bin_filename = f"threat_{int(datetime.now().timestamp())}_{safe_filename}"
+                    bin_path = os.path.join(bin_dir, bin_filename)
+                    
+                    shutil.copy2(os.path.abspath(v_path), bin_path)
+                    print(f"SUCCESS: Archived video to {bin_path}")
+                    results["archived_to_bin"] = True
+                except Exception as db_err:
+                    print(f"CRITICAL ERROR in Forensic Persistence: {db_err}")
+        
+        # Cleanup temp if not moved to bin
+        if os.path.exists(v_path):
+            os.remove(v_path)
+
         return {
             "status": "success", "filename": file.filename,
             "alerts_found": len(results["alerts"]), "alerts": results["alerts"],
-            "processed_url": results["processed_url"], "metrics": results["metrics"]
+            "processed_url": results["processed_url"], "metrics": results["metrics"],
+            "archived_to_bin": results.get("archived_to_bin", False)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

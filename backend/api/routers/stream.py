@@ -97,6 +97,8 @@ async def websocket_live_feed(websocket: WebSocket):
                     alert = None
                     if risk_score > 50:
                         alert = ml_service.risk_engine.generate_alert(risk_score, risk_factors)
+                        # Ensure level is uppercase for consistency
+                        alert['level'] = alert['level'].upper()
                         
                         # SMART STORAGE: Trigger recording for significant threats
                         if risk_score > 70:

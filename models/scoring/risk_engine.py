@@ -9,7 +9,7 @@ class RiskScoringEngine:
     Combines behavioral signals, context, and temporal tracking
     to calculate a unified threat score.
     """
-    def __init__(self, fps=30):
+    def __init__(self, fps=30, bypass_calibration=False):
         # Track person positions over time for behavior analysis
         self.person_history = defaultdict(lambda: deque(maxlen=300))  # 10 seconds at 30fps
         self.person_last_seen = {} # {tid: timestamp}
@@ -21,7 +21,8 @@ class RiskScoringEngine:
         self.fps = fps
         self.calibration_duration = 30 # seconds to learn "normal"
         self.start_time = None
-        self.is_calibrated = False
+        self.is_calibrated = bypass_calibration # If bypassed, we start calibrated
+        self.bypass_calib = bypass_calibration
         self.baseline = {
             'avg_crowd': 0,
             'max_crowd': 0,
@@ -29,14 +30,14 @@ class RiskScoringEngine:
             'proximity_median': 0
         }
         
-        # Configurable weights (Sum = 1.0)
+        # Balanced weights (Sum = 1.0) as per Innovation Spec
         self.weights = {
             'aggressive_posture': 0.25,
-            'proximity_violation': 0.25,
+            'proximity_violation': 0.20,
             'unattended_object': 0.20,
             'loitering': 0.15,
             'crowd_density': 0.10,
-            'contextual': 0.05
+            'contextual': 0.10
         }
         
         # Time-Based Thresholds (Seconds)
@@ -54,6 +55,7 @@ class RiskScoringEngine:
         """
         # 0. Calibration Phase
         current_time = context.get('timestamp', 0) if context else 0
+        self._current_timestamp = current_time # Internal state for helpers
         if self.start_time is None: self.start_time = current_time
         
         elapsed = current_time - self.start_time
@@ -86,7 +88,10 @@ class RiskScoringEngine:
         # 2. Multi-Signal Validation
         high_risk_count = sum(1 for v in factors.values() if v > 0.5)
         
-        if high_risk_count < 2 and factors['unattended_object'] < 0.5:
+        # If we have a VERY high signal in aggression, avoid suppression
+        if factors.get('aggressive_posture', 0) > 0.75:
+            suppression_factor = 1.0
+        elif high_risk_count < 2 and factors['unattended_object'] < 0.5:
             suppression_factor = 0.7  
         else:
             suppression_factor = 1.0
@@ -107,11 +112,14 @@ class RiskScoringEngine:
     def _update_history(self, poses):
         """Update movement history for tracked persons"""
         current_ids = set()
+        current_time = self._current_timestamp or 0
+        
         for pose in poses:
             if 'track_id' in pose and pose['track_id'] != -1:
                 tid = pose['track_id']
                 center = self._get_bbox_center(pose['bbox'])
-                self.person_history[tid].append(center)
+                # Store position with timestamp
+                self.person_history[tid].append((center, current_time))
                 current_ids.add(tid)
         
         # Cleanup old IDs
@@ -245,8 +253,9 @@ class RiskScoringEngine:
             tid = obj['track_id']
             history = self.person_history[tid]
             
-            # Use seconds instead of frame count
-            history_seconds = len(history) / self.fps
+            # Use timestamps instead of frame count for loitering duration
+            if len(history) < 2: continue
+            history_seconds = history[-1][1] - history[0][1]
             if history_seconds < self.thresholds['loitering_time']:
                 continue
             
@@ -254,13 +263,13 @@ class RiskScoringEngine:
             box = obj['bbox']
             height = box[3] - box[1]
             
-            # Displacement between start and end of loitering window
-            start_pos = np.array(history[0])
-            end_pos = np.array(history[-1])
+            # Displacement between start and end of loitering window using timestamps
+            start_pos = np.array(history[0][0])
+            end_pos = np.array(history[-1][0])
             displacement = np.linalg.norm(end_pos - start_pos)
             
-            # Scale-invariant movement check
-            if displacement < (height * 0.5):
+            # Scale-invariant movement check: If moved < 25% of height over the window
+            if displacement < (height * 0.25):
                 loiter_count += 1
                 
         if p_count == 0: return 0.0
@@ -344,11 +353,14 @@ class RiskScoringEngine:
         if len(history) < 5:
             return False
         
-        # Use person height for scale-invariant threshold
+        # Calculate displacement relative to height over the buffer
         person_height = pose['bbox'][3] - pose['bbox'][1] if 'bbox' in pose else 100
-        movement_threshold = person_height * 0.15  # 15% of height
+        movement_threshold = person_height * 0.2 # 20% of height displacement
         
-        recent_movement = np.linalg.norm(np.array(history[-1]) - np.array(history[0]))
+        start_pos = np.array(history[0][0])
+        end_pos = np.array(history[-1][0])
+        recent_movement = np.linalg.norm(end_pos - start_pos)
+        
         return recent_movement > movement_threshold
 
     @staticmethod
@@ -428,7 +440,7 @@ class RiskScoringEngine:
             history = self.person_history[tid]
             
             # Require at least 1s of history for quality analysis
-            if len(history) < self.fps:
+            if len(history) < 2 or (history[-1][1] - history[0][1]) < 1.0:
                 continue
             
             # Get current person scale for normalization
@@ -437,44 +449,44 @@ class RiskScoringEngine:
             # 1. Analyze Acceleration
             velocities = []
             for i in range(1, len(history)):
-                vel = np.linalg.norm(np.array(history[i]) - np.array(history[i-1]))
-                velocities.append(vel)
+                # history[i] is (pos, time)
+                dist = np.linalg.norm(np.array(history[i][0]) - np.array(history[i-1][0]))
+                dt = history[i][1] - history[i-1][1]
+                if dt > 0:
+                    velocities.append(dist / dt)
             
-            if len(velocities) >= 10:
-                recent_vel = np.mean(velocities[-5:])
-                prev_vel = np.mean(velocities[-10:-5])
+            if len(velocities) >= 5:
+                recent_vel = np.mean(velocities[-3:])
+                prev_vel = np.mean(velocities[-10:-3]) if len(velocities) > 10 else velocities[0]
                 
-                # Use scale-invariant threshold: acceleration > 25% of height per 5 frames
-                # And multiplier > 3x for clear aggression
-                if recent_vel > prev_vel * 3.0 and recent_vel > (height * 0.25):
+                # Strict check: 3x speed increase AND velocity > 50% of height per second
+                if recent_vel > prev_vel * 3.0 and recent_vel > (height * 0.5):
                     patterns.append(f"Rapid acceleration detected (Track {tid})")
             
             # 2. Analyze Direction (Filter out normal walking jitter)
-            # Increase window to 30 frames (1s at 30fps)
-            if len(history) >= 30:
+            if len(history) >= 10:
                 directions = []
                 for i in range(1, len(history)):
-                    dx = history[i][0] - history[i-1][0]
-                    dy = history[i][1] - history[i-1][1]
+                    dx = history[i][0][0] - history[i-1][0][0]
+                    dy = history[i][0][1] - history[i-1][0][1]
                     
-                    # Ignore movements smaller than 5% of height (jitter)
                     if abs(dx) > (height * 0.05) or abs(dy) > (height * 0.05):
                         angle = np.arctan2(dy, dx)
                         directions.append(angle)
                 
-                if len(directions) >= 10:
+                if len(directions) >= 6:
                     reversals = 0
                     for i in range(1, len(directions)):
                         angle_diff = abs(directions[i] - directions[i-1])
                         if angle_diff > np.pi:
                             angle_diff = 2 * np.pi - angle_diff
                         
-                        # Look for clear reversals (> 120 degrees)
-                        if angle_diff > (2 * np.pi / 3):
+                        # Look for clear reversals (> 110 degrees)
+                        if angle_diff > (np.pi * 0.6): 
                             reversals += 1
                     
-                    # Require 4 clear reversals in 1s for "erratic" label
-                    if reversals >= 4:
+                    # Require 3 clear reversals for "erratic" label
+                    if reversals >= 3:
                         patterns.append(f"Erratic movement pattern (Track {tid})")
         
         return patterns

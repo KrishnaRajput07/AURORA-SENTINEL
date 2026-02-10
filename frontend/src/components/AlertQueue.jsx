@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+
 // Transitions
 const Transition = React.forwardRef(function Transition(props, ref) {
     return <Slide direction="up" ref={ref} {...props} />;
@@ -25,7 +28,8 @@ const RESOLUTION_TYPES = [
     { value: 'Equipment Check', label: 'Equipment Check', color: 'warning' },
 ];
 
-const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts passed from Dashboard, but we might fetch our own history
+const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => {
+    const { user } = useAuth();
     const theme = useTheme();
     const [activeTab, setActiveTab] = useState(0); // 0: Active, 1: History
 
@@ -62,7 +66,7 @@ const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts pa
             await fetch(`http://localhost:8000/alerts/${alert.id}/acknowledge`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ operator_name: 'Officer DB' }) // Mock operator
+                body: JSON.stringify({ operator_name: user?.name || 'Operator' })
             });
             onAcknowledge(); // Refresh parent
         } catch (error) { console.error(error); }
@@ -84,7 +88,7 @@ const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts pa
                 body: JSON.stringify({
                     resolution_type: resolutionType,
                     resolution_notes: resolutionNotes,
-                    operator_name: 'Officer DB'
+                    operator_name: user?.name || 'Operator'
                 })
             });
             setOpenResolve(false);
@@ -172,7 +176,23 @@ const AlertQueue = ({ alerts: propAlerts, onAcknowledge }) => { // propAlerts pa
                                     />
                                 </TableCell>
                                 <TableCell sx={{ fontWeight: 600, color: theme.palette.text.secondary }}>
-                                    {alert.camera_id}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        {alert.camera_id}
+                                        {alert.camera_id === 'FORENSIC-01' && (
+                                            <Chip
+                                                label="FORENSIC"
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{
+                                                    height: 18,
+                                                    fontSize: '0.6rem',
+                                                    fontWeight: 900,
+                                                    borderColor: theme.palette.primary.main,
+                                                    color: theme.palette.primary.main
+                                                }}
+                                            />
+                                        )}
+                                    </Box>
                                 </TableCell>
                                 <TableCell>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

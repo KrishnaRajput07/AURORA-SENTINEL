@@ -3,16 +3,20 @@ import { Box, Typography, Paper, Grid, Switch, FormControlLabel, Divider, useThe
 import { Server, Database, Shield, Cpu, Activity, Users, FileText, HardDrive, RefreshCw, LogOut } from 'lucide-react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const SystemPage = () => {
     const [tabIndex, setTabIndex] = useState(0);
     const [health, setHealth] = useState(null);
+    const [isCalibrating, setIsCalibrating] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const [scanMessage, setScanMessage] = useState('');
     const theme = useTheme();
     const location = useLocation();
 
     useEffect(() => {
         if (location.state?.openProfile) {
-            setTabIndex(3);
+            setTabIndex(2);
         }
     }, [location.state]);
 
@@ -25,6 +29,30 @@ const SystemPage = () => {
 
     const handleTabChange = (event, newValue) => {
         setTabIndex(newValue);
+    };
+
+    const handleRecalibrate = () => {
+        setIsCalibrating(true);
+        setTimeout(() => {
+            setIsCalibrating(false);
+            alert('Sensors recalibrated successfully!');
+        }, 3000);
+    };
+
+    const handleSecurityCheck = () => {
+        setIsScanning(true);
+        setScanMessage('Scanning system... 0%');
+        const intervals = [20, 45, 70, 95, 100];
+        intervals.forEach((val, i) => {
+            setTimeout(() => {
+                setScanMessage(`Scanning system... ${val}%`);
+                if (val === 100) {
+                    setIsScanning(false);
+                    setScanMessage('');
+                    alert('Security Check Complete: System Secure.');
+                }
+            }, (i + 1) * 600);
+        });
     };
 
     // --- Sub-Components ---
@@ -56,7 +84,15 @@ const SystemPage = () => {
                         <FormControlLabel control={<Switch defaultChecked size="small" />} label={<Typography variant="body2">Auto-Archive Events</Typography>} sx={{ mb: 1, display: 'flex' }} />
                         <FormControlLabel control={<Switch size="small" />} label={<Typography variant="body2">Developer/Debug Mode</Typography>} sx={{ mb: 1, display: 'flex' }} />
                         <Divider sx={{ my: 2 }} />
-                        <Button variant="outlined" size="small" startIcon={<RefreshCw size={14} />}>Recalibrate Sensors</Button>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<RefreshCw size={14} className={isCalibrating ? 'spin-animation' : ''} />}
+                            onClick={handleRecalibrate}
+                            disabled={isCalibrating}
+                        >
+                            {isCalibrating ? 'Calibrating...' : 'Recalibrate Sensors'}
+                        </Button>
                     </Box>
                 </Paper>
             </Grid>
@@ -103,37 +139,6 @@ const SystemPage = () => {
         </Paper>
     );
 
-    const AuditLogsTab = () => (
-        <Paper sx={{ width: '100%', overflow: 'hidden', borderRadius: 2, border: '1px solid #E2E8F0' }}>
-            <TableContainer>
-                <Table size="small">
-                    <TableHead sx={{ bgcolor: '#F7FAFC' }}>
-                        <TableRow>
-                            <TableCell sx={{ fontWeight: 600, color: '#718096' }}>TIMESTAMP</TableCell>
-                            <TableCell sx={{ fontWeight: 600, color: '#718096' }}>ACTION</TableCell>
-                            <TableCell sx={{ fontWeight: 600, color: '#718096' }}>USER</TableCell>
-                            <TableCell sx={{ fontWeight: 600, color: '#718096' }}>DETAILS</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {[
-                            { time: '10:42:05', action: 'LOGIN_SUCCESS', user: 'operator_01', details: 'IP: 192.168.1.105' },
-                            { time: '10:15:30', action: 'CONFIG_UPDATE', user: 'admin', details: 'Threshold set to 0.75' },
-                            { time: '09:55:12', action: 'ALERT_ACK', user: 'operator_01', details: 'ID: ALERT-9932' },
-                            { time: '09:00:01', action: 'SYSTEM_START', user: 'system', details: 'Service initialization' },
-                        ].map((row, i) => (
-                            <TableRow key={i} hover>
-                                <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{row.time}</TableCell>
-                                <TableCell sx={{ fontWeight: 600, color: theme.palette.primary.main }}>{row.action}</TableCell>
-                                <TableCell>{row.user}</TableCell>
-                                <TableCell sx={{ color: 'text.secondary' }}>{row.details}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
-        </Paper>
-    );
 
     return (
         <Box>
@@ -143,11 +148,17 @@ const SystemPage = () => {
                         System Management
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                        Configure system parameters, manage users, and view audit logs.
+                        Configure system parameters and manage user access.
                     </Typography>
                 </Box>
-                <Button variant="contained" startIcon={<Shield size={18} />} disableElevation>
-                    Security Check
+                <Button
+                    variant="contained"
+                    startIcon={<Shield size={18} />}
+                    disableElevation
+                    onClick={handleSecurityCheck}
+                    disabled={isScanning}
+                >
+                    {isScanning ? scanMessage : 'Security Check'}
                 </Button>
             </Box>
 
@@ -155,30 +166,66 @@ const SystemPage = () => {
                 <Tabs value={tabIndex} onChange={handleTabChange} textColor="primary" indicatorColor="primary">
                     <Tab label="General" icon={<Activity size={16} />} iconPosition="start" sx={{ minHeight: 48 }} />
                     <Tab label="Access Control" icon={<Users size={16} />} iconPosition="start" sx={{ minHeight: 48 }} />
-                    <Tab label="Audit Logs" icon={<FileText size={16} />} iconPosition="start" sx={{ minHeight: 48 }} />
                     <Tab label="Profile" icon={<Users size={16} />} iconPosition="start" sx={{ minHeight: 48 }} />
                 </Tabs>
             </Box>
 
             {tabIndex === 0 && <GeneralTab />}
             {tabIndex === 1 && <AccessControlTab />}
-            {tabIndex === 2 && <AuditLogsTab />}
-            {tabIndex === 3 && <ProfileTab />}
+            {tabIndex === 2 && <ProfileTab />}
+
+            <style>
+                {`
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                .spin-animation {
+                    animation: spin 1s linear infinite;
+                }
+                `}
+            </style>
         </Box>
     );
 };
 
 const ProfileTab = () => {
+    const { user: authUser, updateProfile, logout: authLogout } = useAuth();
+    const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
     const [userData, setUserData] = useState({
-        name: 'Operator Name',
-        email: 'operator@sentinel.ai',
-        role: 'Senior Analyst',
-        id: 'OP-4921'
+        name: authUser?.name || 'Operator Name',
+        email: authUser?.email || 'operator@sentinel.ai',
+        role: authUser?.role || 'Senior Analyst',
+        id: authUser?.id || 'OP-4921'
     });
+
+    useEffect(() => {
+        if (authUser) {
+            setUserData({
+                name: authUser.name,
+                email: authUser.email || 'operator@sentinel.ai',
+                role: authUser.role,
+                id: authUser.id
+            });
+        }
+    }, [authUser]);
 
     const handleChange = (e) => {
         setUserData({ ...userData, [e.target.name]: e.target.value });
+    };
+
+    const handleSave = () => {
+        updateProfile({
+            name: userData.name,
+            email: userData.email
+        });
+        setIsEditing(false);
+    };
+
+    const handleLogout = () => {
+        authLogout();
+        navigate('/login');
     };
 
     return (
@@ -239,7 +286,7 @@ const ProfileTab = () => {
 
             <Box sx={{ mt: 5, display: 'flex', gap: 2, justifyContent: 'center' }}>
                 {isEditing ? (
-                    <Button variant="contained" onClick={() => setIsEditing(false)} sx={{ minWidth: 120 }}>Save Changes</Button>
+                    <Button variant="contained" onClick={handleSave} sx={{ minWidth: 120 }}>Save Changes</Button>
                 ) : (
                     <Button variant="outlined" onClick={() => setIsEditing(true)} sx={{ minWidth: 120 }}>Edit Profile</Button>
                 )}
@@ -247,7 +294,7 @@ const ProfileTab = () => {
                     variant="text"
                     color="error"
                     startIcon={<Box component={LogOut} size={18} />}
-                    onClick={() => alert('Logged out successfully')}
+                    onClick={handleLogout}
                 >
                     Logout
                 </Button>

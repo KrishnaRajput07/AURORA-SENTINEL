@@ -3,7 +3,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:hackathon2024@postgres:5432/aurora")
+# Force SQLite for consistency during debugging
+DATABASE_URL = "sqlite:///./aurora.db"
 
 try:
     engine = create_engine(DATABASE_URL)

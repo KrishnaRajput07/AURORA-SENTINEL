@@ -25,13 +25,19 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('aurora_user', JSON.stringify(userData));
     };
 
+    const updateProfile = (newData) => {
+        const updatedUser = { ...user, ...newData };
+        setUser(updatedUser);
+        localStorage.setItem('aurora_user', JSON.stringify(updatedUser));
+    };
+
     const logout = () => {
         setUser(null);
         localStorage.removeItem('aurora_user');
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, logout, updateProfile, loading }}>
             {!loading && children}
         </AuthContext.Provider>
     );

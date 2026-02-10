@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Box, Typography, Paper, Grid, Button, IconButton, LinearProgress, Drawer, List, ListItem, alpha, useTheme, Chip, Divider, CircularProgress } from '@mui/material';
+import { Box, Typography, Paper, Grid, Button, IconButton, LinearProgress, Drawer, List, ListItem, alpha, useTheme, Chip, Divider, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { Upload, FileVideo, X, Play, Shield, Search, ChevronRight, AlertTriangle, CheckCircle2, Clock, Activity, Users, Target, Rewind, Maximize2, FileText } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import jsPDF from 'jspdf';
@@ -12,6 +12,7 @@ const Intelligence = () => {
     const [analysisResult, setAnalysisResult] = useState(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('summary');
+    const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
     const videoRef = useRef(null);
     const theme = useTheme();
 
@@ -47,6 +48,14 @@ const Intelligence = () => {
             clearInterval(timer);
             setAnalysisResult(data);
             setDrawerOpen(true);
+
+            if (data.metrics?.fight_probability >= 30) {
+                setNotification({
+                    open: true,
+                    message: "High Risk Detected! Video automatically moved to Smart Bin (Archive).",
+                    severity: "warning"
+                });
+            }
         } catch (error) {
             console.error('Upload failed:', error);
         } finally {
@@ -91,9 +100,9 @@ const Intelligence = () => {
 
         doc.setFontSize(11);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Fight Probability: ${analysisResult.metrics.fight_probability}%`, 20, 66);
-        doc.text(`Maximum Persons Detected: ${analysisResult.metrics.max_persons}`, 20, 73);
-        doc.text(`Total Alerts Generated: ${analysisResult.alerts.length}`, 20, 80);
+        doc.text(`Fight Probability: ${analysisResult.metrics?.fight_probability ?? 0}%`, 20, 66);
+        doc.text(`Maximum Persons Detected: ${analysisResult.metrics?.max_persons ?? 0}`, 20, 73);
+        doc.text(`Total Alerts Generated: ${analysisResult.alerts?.length ?? 0}`, 20, 80);
 
         // Suspicious Patterns
         doc.setFontSize(14);
@@ -102,7 +111,7 @@ const Intelligence = () => {
 
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        if (analysisResult.metrics.suspicious_patterns.length > 0) {
+        if (analysisResult.metrics?.suspicious_patterns?.length > 0) {
             analysisResult.metrics.suspicious_patterns.forEach((pattern, i) => {
                 doc.text(`• ${pattern}`, 25, 100 + (i * 6));
             });
@@ -116,11 +125,11 @@ const Intelligence = () => {
         const tableStartY = 100 + (analysisResult.metrics.suspicious_patterns.length * 6) + 10;
         doc.text('Detailed Alert Timeline', 20, tableStartY);
 
-        const tableData = analysisResult.alerts.map(alert => [
-            `${Math.floor(alert.timestamp_seconds / 60)}:${(alert.timestamp_seconds % 60).toFixed(0).padStart(2, '0')}`,
-            alert.level.toUpperCase(),
-            `${alert.score}%`,
-            alert.top_factors.join(', ')
+        const tableData = (analysisResult.alerts || []).map(alert => [
+            `${Math.floor((alert.timestamp_seconds || 0) / 60)}:${((alert.timestamp_seconds || 0) % 60).toFixed(0).padStart(2, '0')}`,
+            (alert.level || 'INFO').toUpperCase(),
+            `${alert.score || 0}%`,
+            (alert.top_factors || []).join(', ')
         ]);
 
         autoTable(doc, {
@@ -246,7 +255,7 @@ const Intelligence = () => {
                                             <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.6, letterSpacing: '0.1em' }}>FIGHT PROBABILITY</Typography>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
                                                 <Typography variant="h2" sx={{ fontWeight: 900, color: theme.palette.error.main }}>
-                                                    {analysisResult.metrics.fight_probability}%
+                                                    {analysisResult.metrics?.fight_probability ?? 0}%
                                                 </Typography>
                                                 <AlertTriangle size={32} color={theme.palette.error.main} />
                                             </Box>
@@ -257,24 +266,31 @@ const Intelligence = () => {
                                     <Grid item xs={12} md={8}>
                                         <Grid container spacing={2}>
                                             <Grid item xs={6} sm={4}>
-                                                <Paper sx={{ p: 2, borderRadius: 4, textAlign: 'center' }}>
-                                                    <Users size={20} style={{ marginBottom: 8, opacity: 0.5 }} />
-                                                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{analysisResult.metrics.max_persons}</Typography>
+                                                <Paper sx={{ p: 2, borderRadius: 4, textAlign: 'center', border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                                                    <Users size={20} style={{ marginBottom: 8, color: theme.palette.primary.main }} />
+                                                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{analysisResult.metrics?.max_persons ?? 0}</Typography>
                                                     <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.5 }}>PEAK CAPACITY</Typography>
                                                 </Paper>
                                             </Grid>
                                             <Grid item xs={6} sm={4}>
-                                                <Paper sx={{ p: 2, borderRadius: 4, textAlign: 'center' }}>
-                                                    <Activity size={20} style={{ marginBottom: 8, opacity: 0.5 }} />
+                                                <Paper sx={{ p: 2, borderRadius: 4, textAlign: 'center', border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                                                    <Activity size={20} style={{ marginBottom: 8, color: theme.palette.primary.main }} />
                                                     <Typography variant="h5" sx={{ fontWeight: 900 }}>POSE</Typography>
                                                     <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.5 }}>ACTIVE SCAN</Typography>
                                                 </Paper>
                                             </Grid>
                                             <Grid item xs={12} sm={4}>
-                                                <Paper sx={{ p: 2, borderRadius: 4, textAlign: 'center', bgcolor: theme.palette.success.main, color: '#fff' }}>
-                                                    <CheckCircle2 size={20} style={{ marginBottom: 8 }} />
-                                                    <Typography variant="h5" sx={{ fontWeight: 900 }}>SECURE</Typography>
-                                                    <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.8 }}>SYSTEM STATUS</Typography>
+                                                <Paper sx={{
+                                                    p: 2,
+                                                    borderRadius: 4,
+                                                    textAlign: 'center',
+                                                    bgcolor: (analysisResult.metrics?.fight_probability > 30 || analysisResult.archived_to_bin) ? theme.palette.error.main : theme.palette.success.main,
+                                                    color: '#fff',
+                                                    boxShadow: (analysisResult.metrics?.fight_probability > 30 || analysisResult.archived_to_bin) ? `0 10px 20px ${alpha(theme.palette.error.main, 0.3)}` : 'none'
+                                                }}>
+                                                    {(analysisResult.metrics?.fight_probability > 30 || analysisResult.archived_to_bin) ? <Shield size={20} style={{ marginBottom: 8 }} /> : <CheckCircle2 size={20} style={{ marginBottom: 8 }} />}
+                                                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{(analysisResult.metrics?.fight_probability > 30 || analysisResult.archived_to_bin) ? 'ARCHIVED' : 'SECURE'}</Typography>
+                                                    <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.8 }}>{(analysisResult.metrics?.fight_probability > 30 || analysisResult.archived_to_bin) ? 'SMART BIN ACTIVE' : 'SYSTEM STATUS'}</Typography>
                                                 </Paper>
                                             </Grid>
                                         </Grid>
@@ -285,7 +301,7 @@ const Intelligence = () => {
                                         <Paper sx={{ p: 3, borderRadius: 5 }}>
                                             <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2 }}>Suspicious Motion Patterns</Typography>
                                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-                                                {analysisResult.metrics.suspicious_patterns.length > 0 ? (
+                                                {(analysisResult.metrics?.suspicious_patterns?.length > 0) ? (
                                                     analysisResult.metrics.suspicious_patterns.map((p, i) => (
                                                         <Chip key={i} label={p} variant="outlined" color="error" sx={{ fontWeight: 700, borderRadius: 2 }} />
                                                     ))
@@ -297,21 +313,30 @@ const Intelligence = () => {
                                     </Grid>
 
                                     {/* Event Markers List */}
+                                    {/* Detailed Event Markers (Timestamps) Restored */}
                                     <Grid item xs={12}>
-                                        <Paper sx={{ p: 3, borderRadius: 5 }}>
-                                            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2 }}>Detailed Event Markers</Typography>
+                                        <Paper sx={{ p: 3, borderRadius: 5, border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Clock size={18} color={theme.palette.primary.main} /> Forensic Event Markers
+                                            </Typography>
                                             <List disablePadding>
-                                                {analysisResult.alerts.map((alert, i) => (
+                                                {(analysisResult.alerts || []).map((alert, i) => (
                                                     <ListItem key={i} button onClick={() => { setDrawerOpen(true); setTimeout(() => seekTo(alert.timestamp_seconds), 100); }}
-                                                        sx={{ px: 2, py: 1.5, mb: 1, borderRadius: 3, bgcolor: alpha(theme.palette.error.main, 0.05), border: `1px solid ${alpha(theme.palette.error.main, 0.1)}` }}>
+                                                        sx={{
+                                                            px: 3, py: 1.5, mb: 1.5,
+                                                            borderRadius: 4,
+                                                            bgcolor: alpha(theme.palette.divider, 0.02),
+                                                            border: `1px solid ${alpha(theme.palette.divider, 0.05)}`,
+                                                            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) }
+                                                        }}>
                                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                                                             <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-                                                                <Typography sx={{ fontWeight: 900, color: theme.palette.error.main, minWidth: 60 }}>
+                                                                <Typography sx={{ fontWeight: 900, color: theme.palette.primary.main, minWidth: 60 }}>
                                                                     {Math.floor(alert.timestamp_seconds / 60)}:{(alert.timestamp_seconds % 60).toFixed(0).padStart(2, '0')}s
                                                                 </Typography>
                                                                 <Box>
-                                                                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{alert.level} RISK DETECTED</Typography>
-                                                                    <Typography variant="caption">Contributing: {alert.top_factors.join(', ')}</Typography>
+                                                                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{(alert.level || 'INFO').toUpperCase()} RISK EVENT</Typography>
+                                                                    <Typography variant="caption">Risk Score: {alert.score || 0}% | Factors: {(alert.top_factors || []).join(', ')}</Typography>
                                                                 </Box>
                                                             </Box>
                                                             <ChevronRight size={20} />
@@ -398,14 +423,14 @@ const Intelligence = () => {
                         <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 2, letterSpacing: '0.1em', opacity: 0.5 }}>FORENSIC TIMELINE</Typography>
                             <List disablePadding>
-                                {analysisResult?.alerts.map((alert, i) => (
+                                {(analysisResult?.alerts || []).map((alert, i) => (
                                     <ListItem key={i} button onClick={() => seekTo(alert.timestamp_seconds)}
                                         sx={{ px: 2, py: 2, mb: 1.5, borderRadius: 3, bgcolor: '#111', border: '1px solid #222', '&:hover': { bgcolor: '#1a1a1a' } }}>
                                         <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-                                            <Typography sx={{ fontWeight: 900, color: theme.palette.primary.main }}>{alert.timestamp_seconds.toFixed(1)}s</Typography>
+                                            <Typography sx={{ fontWeight: 900, color: theme.palette.primary.main }}>{(alert.timestamp_seconds || 0).toFixed(1)}s</Typography>
                                             <Box>
-                                                <Typography variant="body2" sx={{ fontWeight: 800 }}>{alert.level} RISK EVENT</Typography>
-                                                <Typography variant="caption" sx={{ opacity: 0.6 }}>Confidence: {alert.score}% | Factors: {alert.top_factors.join(', ')}</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 800 }}>{(alert.level || 'INFO').toUpperCase()} RISK EVENT</Typography>
+                                                <Typography variant="caption" sx={{ opacity: 0.6 }}>Confidence: {alert.score || 0}% | Factors: {(alert.top_factors || []).join(', ')}</Typography>
                                             </Box>
                                         </Box>
                                     </ListItem>
@@ -438,6 +463,17 @@ const Intelligence = () => {
                     }
                 `}
             </style>
+
+            <Snackbar
+                open={notification.open}
+                autoHideDuration={6000}
+                onClose={() => setNotification({ ...notification, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert severity={notification.severity} variant="filled" sx={{ borderRadius: 3, fontWeight: 700, px: 3 }}>
+                    {notification.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

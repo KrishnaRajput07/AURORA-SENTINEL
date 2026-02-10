@@ -4,9 +4,9 @@ import os
 from datetime import datetime
 
 router = APIRouter()
-STORAGE_PATH = "storage/clips"
-BIN_PATH = "storage/bin"
-PROCESSED_PATH = "storage/processed"
+STORAGE_PATH = os.path.abspath("storage/clips")
+BIN_PATH = os.path.abspath("storage/bin")
+PROCESSED_PATH = os.path.abspath("storage/processed")
 
 @router.get("/list")
 async def list_archives(source: str = "active"):
