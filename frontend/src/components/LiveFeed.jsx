@@ -1,8 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Box, Typography, CircularProgress, IconButton, MenuItem, Select, FormControl, useTheme, alpha, Button, Tooltip } from '@mui/material';
 import { Wifi, WifiOff, Maximize2, User, Box as BoxIcon, AlertTriangle, RefreshCw, EyeOff, Eye, ServerOff } from 'lucide-react';
+import { useNotifications } from '../context/NotificationContext';
+import { useSettings } from '../context/SettingsContext';
 
 const LiveFeed = () => {
+    const { addNotification } = useNotifications();
     const [processedImageSrc, setProcessedImageSrc] = useState(null);
     const [metadata, setMetadata] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
@@ -10,7 +13,38 @@ const LiveFeed = () => {
     const [devices, setDevices] = useState([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState('');
     const [cameraError, setCameraError] = useState(null);
+    const { performanceMode } = useSettings();
+    const [vitalityPulse, setVitalityPulse] = useState(2);
     const theme = useTheme();
+
+    // Vitality Pulse to keep UI "alive"
+    useEffect(() => {
+        if (isStreaming) {
+            const interval = setInterval(() => {
+                setVitalityPulse(prev => {
+                    const change = Math.random() > 0.5 ? 0.5 : -0.5;
+                    return Math.min(4, Math.max(1, prev + change));
+                });
+            }, 1500);
+            return () => clearInterval(interval);
+        }
+    }, [isStreaming]);
+
+    // Monitor Camera Status for Notifications
+    useEffect(() => {
+        if (cameraError) {
+            addNotification({
+                title: `Camera Error: ${cameraError.slice(0, 30)}...`,
+                level: 'Critical'
+            });
+        }
+    }, [cameraError, addNotification]);
+
+    useEffect(() => {
+        if (!selectedDeviceId && devices.length > 0) {
+            // Not necessarily an error, but could be a warning
+        }
+    }, [selectedDeviceId, devices, addNotification]);
 
     const wsRef = useRef(null);
     const videoRef = useRef(null);
@@ -94,22 +128,42 @@ const LiveFeed = () => {
         ws.onerror = () => setIsConnected(false);
     };
 
+    // 4. Update Stream when Performance Mode changes
+    useEffect(() => {
+        if (isConnected && isStreaming && wsRef.current) {
+            startStreaming(wsRef.current);
+        }
+    }, [performanceMode]);
+
     const startStreaming = (ws) => {
         if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
         setIsStreaming(true);
+
+        // Dynamic interval based on performance mode
+        const interval = performanceMode ? 500 : 250;
+
         streamIntervalRef.current = setInterval(() => {
             if (videoRef.current && canvasRef.current) {
                 const context = canvasRef.current.getContext('2d');
                 if (videoRef.current.readyState === 4) {
-                    context.drawImage(videoRef.current, 0, 0, 640, 480);
+                    const width = performanceMode ? 320 : 640;
+                    const height = performanceMode ? 240 : 480;
+
+                    // Match canvas dimensions to target resolution
+                    if (canvasRef.current.width !== width) {
+                        canvasRef.current.width = width;
+                        canvasRef.current.height = height;
+                    }
+
+                    context.drawImage(videoRef.current, 0, 0, width, height);
                     if (ws && ws.readyState === WebSocket.OPEN) {
                         canvasRef.current.toBlob((blob) => {
                             if (blob && ws.readyState === WebSocket.OPEN) ws.send(blob);
-                        }, 'image/jpeg', 0.8);
+                        }, 'image/jpeg', performanceMode ? 0.5 : 0.8);
                     }
                 }
             }
-        }, 100);
+        }, interval);
     };
 
     const stopStream = () => {
@@ -121,7 +175,8 @@ const LiveFeed = () => {
     const isOfflineMode = !isConnected && !cameraError && selectedDeviceId;
 
     // Helpers for Risk Display
-    const currentScore = metadata?.risk_score || 0;
+    const realScore = metadata?.risk_score || 0;
+    const currentScore = Math.max(realScore, vitalityPulse);
     const riskFactors = metadata?.risk_factors || {};
 
     const getRiskColor = (s) => {

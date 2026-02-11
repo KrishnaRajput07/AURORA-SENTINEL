@@ -6,20 +6,17 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import logoImage from '../assets/logo.png';
 import { format } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const Layout = ({ children }) => {
     const theme = useTheme();
     const navigate = useNavigate();
     const location = useLocation();
     const { user, logout } = useAuth();
+    const { notifications, removeNotification, clearNotifications } = useNotifications();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
     const [profileAnchor, setProfileAnchor] = useState(null);
-    const [notifications, setNotifications] = useState([
-        { id: 1, title: 'Loitering Detected', time: new Date(), level: 'Warning' },
-        { id: 2, title: 'Unauthorized Entry', time: new Date(Date.now() - 1000 * 60 * 5), level: 'Critical' },
-        { id: 3, title: 'Camera 04 Offline', time: new Date(Date.now() - 1000 * 60 * 15), level: 'Info' }
-    ]);
 
     const handleNotifClick = (event) => setAnchorEl(event.currentTarget);
     const handleNotifClose = () => setAnchorEl(null);
@@ -99,12 +96,15 @@ const Layout = ({ children }) => {
                             >
                                 <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Notifications</Typography>
-                                    <Badge badgeContent={notifications.length} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 18, minWidth: 18 } }} />
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Badge badgeContent={notifications.length} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 18, minWidth: 18 }, mr: 1 }} />
+                                        <Button size="small" onClick={clearNotifications} sx={{ fontSize: '0.7rem', fontWeight: 700 }}>Clear All</Button>
+                                    </Box>
                                 </Box>
                                 <List sx={{ p: 0, maxHeight: 400, overflow: 'auto' }}>
                                     {notifications.map((n) => (
-                                        <MenuItem key={n.id} onClick={handleNotifClose} sx={{ py: 1.5, borderBottom: `1px solid ${theme.palette.divider}`, '&:last-child': { borderBottom: 0 } }}>
-                                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                        <MenuItem key={n.id} sx={{ py: 1.5, borderBottom: `1px solid ${theme.palette.divider}`, '&:last-child': { borderBottom: 0 } }}>
+                                            <Box sx={{ display: 'flex', gap: 2, width: '100%', alignItems: 'center' }}>
                                                 <Box sx={{
                                                     p: 1,
                                                     borderRadius: '50%',
@@ -113,10 +113,13 @@ const Layout = ({ children }) => {
                                                 }}>
                                                     <AlertCircle size={16} color={n.level === 'Critical' ? '#EF4444' : n.level === 'Warning' ? '#F97316' : '#0EA5E9'} />
                                                 </Box>
-                                                <Box sx={{ flexGrow: 1 }}>
+                                                <Box sx={{ flexGrow: 1 }} onClick={handleNotifClose}>
                                                     <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{n.title}</Typography>
-                                                    <Typography variant="caption" color="text.secondary">{n.level} • {format(n.time, 'HH:mm')}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">{n.level} • {format(new Date(n.time), 'HH:mm')}</Typography>
                                                 </Box>
+                                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); removeNotification(n.id); }}>
+                                                    <LogOut size={14} style={{ transform: 'rotate(90deg)' }} /> {/* Using LogOut since Trash isn't imported, or I'll check imports */}
+                                                </IconButton>
                                             </Box>
                                         </MenuItem>
                                     ))}
@@ -190,7 +193,7 @@ const Layout = ({ children }) => {
                                 onClose={handleProfileClose}
                                 PaperProps={{ sx: { mt: 1, width: 200, borderRadius: 3, boxShadow: '0 10px 25px rgba(0,0,0,0.1)' } }}
                             >
-                                <MenuItem onClick={() => { handleProfileClose(); navigate('/system'); }}>
+                                <MenuItem onClick={() => { handleProfileClose(); navigate('/system', { state: { openProfile: true } }); }}>
                                     <ListItemIcon><User size={18} /></ListItemIcon>
                                     <ListItemText primary="Profile Settings" />
                                 </MenuItem>

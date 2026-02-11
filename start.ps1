@@ -14,7 +14,7 @@ function Start-Component {
 }
 
 # 1. Start Backend
-Start-Component -Title "Backend API" -Command "python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload" -Path "$PSScriptRoot"
+Start-Component -Title "Backend API" -Command ".\venv\Scripts\python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload" -Path "$PSScriptRoot"
 
 # 2. Start Frontend
 # Check if node_modules exists, if not install

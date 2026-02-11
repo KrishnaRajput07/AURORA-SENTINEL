@@ -4,6 +4,7 @@ import { Server, Database, Shield, Cpu, Activity, Users, FileText, HardDrive, Re
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 
 const SystemPage = () => {
     const [tabIndex, setTabIndex] = useState(0);
@@ -13,6 +14,7 @@ const SystemPage = () => {
     const [scanMessage, setScanMessage] = useState('');
     const theme = useTheme();
     const location = useLocation();
+    const { performanceMode, setPerformanceMode } = useSettings();
 
     useEffect(() => {
         if (location.state?.openProfile) {
@@ -82,6 +84,11 @@ const SystemPage = () => {
                     <Box sx={{ p: 3 }}>
                         <FormControlLabel control={<Switch defaultChecked size="small" />} label={<Typography variant="body2">Enable Audio Alerts</Typography>} sx={{ mb: 1, display: 'flex' }} />
                         <FormControlLabel control={<Switch defaultChecked size="small" />} label={<Typography variant="body2">Auto-Archive Events</Typography>} sx={{ mb: 1, display: 'flex' }} />
+                        <FormControlLabel
+                            control={<Switch size="small" checked={performanceMode} onChange={(e) => setPerformanceMode(e.target.checked)} />}
+                            label={<Typography variant="body2">High Performance Mode (Low Latency)</Typography>}
+                            sx={{ mb: 1, display: 'flex' }}
+                        />
                         <FormControlLabel control={<Switch size="small" />} label={<Typography variant="body2">Developer/Debug Mode</Typography>} sx={{ mb: 1, display: 'flex' }} />
                         <Divider sx={{ my: 2 }} />
                         <Button

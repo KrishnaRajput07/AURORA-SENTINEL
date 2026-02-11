@@ -7,12 +7,23 @@ import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Shield, AlertTriangle, MoreHorizontal } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const Dashboard = () => {
     const { user } = useAuth();
+    const { addNotification } = useNotifications();
     const [alerts, setAlerts] = useState([]);
     const [riskData, setRiskData] = useState(null);
     const theme = useTheme();
+
+    useEffect(() => {
+        if (riskData?.risk_level && parseFloat(riskData.risk_level) > 30) {
+            addNotification({
+                title: `Elevated Threat: ${riskData.risk_level}%`,
+                level: 'Warning'
+            });
+        }
+    }, [riskData, addNotification]);
 
     useEffect(() => {
         fetchAlerts();
@@ -50,24 +61,9 @@ const Dashboard = () => {
             {/* Header Area */}
             <Grid item xs={12}>
                 <Box sx={{ mb: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.text.primary, display: 'flex', gap: 1, alignItems: 'center' }}>
-                            <GreetingCycler />
-                            <span style={{ color: theme.palette.primary.main, marginLeft: '0.2em' }}>{user?.name || 'Operator'}</span>
-                        </Typography>
-                        <Box sx={{
-                            px: 1.5,
-                            py: 0.5,
-                            bgcolor: user?.role === 'admin' ? theme.palette.secondary.main : theme.palette.primary.main,
-                            color: 'white',
-                            borderRadius: '4px',
-                            fontSize: '0.75rem',
-                            fontWeight: 800,
-                            ml: 2,
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}>
-                            ID: {user?.id || 'OP-4921'}
-                        </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <TypewriterHeader name={user?.name} />
+                        <CyberID id={user?.id || 'OP-4921'} role={user?.role} />
                     </Box>
                     <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
                         Live monitoring and safety analytics.
@@ -173,49 +169,119 @@ const Dashboard = () => {
     );
 };
 
-const GreetingCycler = () => {
+const TypewriterHeader = ({ name }) => {
     const greetings = ["Hello", "Namaste", "Hola", "Bonjour", "Ciao"];
-    const [index, setIndex] = useState(0);
-
-    // Calculate the max width needed for consistent sizing
-    const maxGreetingLength = Math.max(...greetings.map(g => g.length));
+    const [text, setText] = useState("");
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [phraseIndex, setPhraseIndex] = useState(0);
+    const [typingSpeed, setTypingSpeed] = useState(100);
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            setIndex((prev) => (prev + 1) % greetings.length);
-        }, 3000);
-        return () => clearInterval(timer);
-    }, []);
+        const currentPhrase = `${greetings[phraseIndex]} ${name || 'Operator'}`;
 
+        const handleTyping = () => {
+            if (!isDeleting && text === currentPhrase) {
+                setTimeout(() => setIsDeleting(true), 1500); // Pause at end
+                return;
+            }
+            if (isDeleting && text === "") {
+                setIsDeleting(false);
+                setPhraseIndex((prev) => (prev + 1) % greetings.length);
+                return;
+            }
+
+            const nextText = isDeleting
+                ? currentPhrase.substring(0, text.length - 1)
+                : currentPhrase.substring(0, text.length + 1);
+
+            setText(nextText);
+            setTypingSpeed(isDeleting ? 50 : 100);
+        };
+
+        const timer = setTimeout(handleTyping, typingSpeed);
+        return () => clearTimeout(timer);
+    }, [text, isDeleting, phraseIndex, typingSpeed, greetings, name]);
+
+    return (
+        <Typography variant="h4" sx={{
+            fontWeight: 800,
+            color: 'text.primary',
+            letterSpacing: '-0.02em',
+            display: 'flex',
+            alignItems: 'center',
+            minHeight: '1.2em'
+        }}>
+            {text}
+            <motion.span
+                animate={{ opacity: [1, 0] }}
+                transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+                style={{
+                    display: 'inline-block',
+                    width: '3px',
+                    height: '1em',
+                    backgroundColor: '#10b981',
+                    marginLeft: '4px'
+                }}
+            />
+        </Typography>
+    );
+};
+
+const CyberID = ({ id, role }) => {
+    const theme = useTheme();
     return (
         <Box sx={{
             position: 'relative',
-            width: `${maxGreetingLength * 0.6}em`, // Fixed width based on longest greeting
-            height: '1.2em',
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
-            overflow: 'hidden'
+            gap: 1.5,
+            px: 2,
+            py: 0.75,
+            background: 'rgba(16, 185, 129, 0.05)',
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.05), transparent)',
+                transform: 'translateX(-100%)',
+                animation: 'shimmer 3s infinite'
+            },
+            '@keyframes shimmer': {
+                '100%': { transform: 'translateX(100%)' }
+            }
         }}>
-            <AnimatePresence mode="wait">
-                <motion.span
-                    key={index}
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: -20, opacity: 0 }}
-                    transition={{ duration: 0.4, ease: 'easeInOut' }}
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        whiteSpace: 'nowrap',
-                        fontSize: 'inherit',
-                        fontWeight: 'inherit',
-                        lineHeight: '1.2em'
-                    }}
-                >
-                    {greetings[index]}
-                </motion.span>
-            </AnimatePresence>
+            <Box sx={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                bgcolor: '#10b981',
+                boxShadow: '0 0 8px #10b981',
+                animation: 'pulse 2s infinite'
+            }} />
+            <Typography sx={{
+                fontFamily: 'monospace',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: '#10b981',
+                letterSpacing: '0.1em'
+            }}>
+                ID: {id}
+            </Typography>
+            <Box sx={{ height: '12px', width: '1px', bgcolor: 'rgba(16, 185, 129, 0.2)' }} />
+            <Typography sx={{
+                fontSize: '0.7rem',
+                fontWeight: 800,
+                color: 'text.secondary',
+                textTransform: 'uppercase'
+            }}>
+                SECURE ACCESS
+            </Typography>
         </Box>
     );
 };

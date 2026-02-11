@@ -14,6 +14,8 @@ import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import NetworkStatusIndicator from './components/NetworkStatusIndicator';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
+import { SettingsProvider } from './context/SettingsContext';
 
 const ProtectedRoute = ({ children, roles }) => {
     const { user, loading } = useAuth();
@@ -84,8 +86,12 @@ function App() {
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <AuthProvider>
-                <NetworkStatusIndicator />
-                <AppContent />
+                <NotificationProvider>
+                    <SettingsProvider>
+                        <NetworkStatusIndicator />
+                        <AppContent />
+                    </SettingsProvider>
+                </NotificationProvider>
             </AuthProvider>
         </ThemeProvider>
     );

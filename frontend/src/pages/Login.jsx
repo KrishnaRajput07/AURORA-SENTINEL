@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Paper, Typography, TextField, Button, IconButton, InputAdornment, Container, Tab, Tabs, alpha, useTheme } from '@mui/material';
+import { Box, Paper, Typography, TextField, Button, IconButton, InputAdornment, Container, Tab, Tabs, alpha, useTheme, CircularProgress } from '@mui/material';
 import { Shield, Eye, EyeOff, Lock, User, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
@@ -8,19 +8,39 @@ import logoImage from '../assets/logo.png';
 
 const Login = () => {
     const theme = useTheme();
-    const { login } = useAuth();
+    const { login, verifyOperator } = useAuth();
     const navigate = useNavigate();
     const [role, setRole] = useState('operator');
     const [showPassword, setShowPassword] = useState(false);
     const [credentials, setCredentials] = useState({ id: '', password: '' });
+    const [loading, setLoading] = useState(false);
 
     const handleRoleChange = (event, newValue) => setRole(newValue);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Mock login
-        login(role);
-        navigate(role === 'admin' ? '/admin' : '/');
+        setLoading(true);
+
+        setTimeout(() => {
+            if (role === 'admin') {
+                if (credentials.id === 'ADM-123' && credentials.password === '0000') {
+                    login(role, { id: 'ADM-123', name: 'System Administrator' });
+                    navigate('/admin');
+                } else {
+                    alert('Authorization revoked: Invalid Admin Credentials');
+                    setLoading(false);
+                }
+            } else {
+                const operator = verifyOperator(credentials.id, credentials.password);
+                if (operator) {
+                    login(role, { id: operator.id, name: operator.name });
+                    navigate('/');
+                } else {
+                    alert('Authorization revoked: Invalid Operator Credentials');
+                    setLoading(false);
+                }
+            }
+        }, 1000);
     };
 
     return (
@@ -124,6 +144,8 @@ const Login = () => {
                                     label="Personnel ID"
                                     placeholder={role === 'admin' ? 'ADM-XXXX' : 'OP-XXXX'}
                                     variant="outlined"
+                                    value={credentials.id}
+                                    onChange={(e) => setCredentials({ ...credentials, id: e.target.value })}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -144,6 +166,8 @@ const Login = () => {
                                     label="Security Key"
                                     type={showPassword ? 'text' : 'password'}
                                     variant="outlined"
+                                    value={credentials.password}
+                                    onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -172,7 +196,8 @@ const Login = () => {
                                     type="submit"
                                     variant="contained"
                                     size="large"
-                                    endIcon={<ArrowRight size={22} />}
+                                    disabled={loading}
+                                    endIcon={loading ? null : <ArrowRight size={22} />}
                                     sx={{
                                         py: 2.25,
                                         borderRadius: 4,
@@ -188,7 +213,7 @@ const Login = () => {
                                         transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                                     }}
                                 >
-                                    Establish Link
+                                    {loading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : 'Establish Link'}
                                 </Button>
                             </Box>
                         </form>

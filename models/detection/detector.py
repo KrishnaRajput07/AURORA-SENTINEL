@@ -7,8 +7,11 @@ class UnifiedDetector:
     """
     Combines object detection and pose estimation with ByteTrack
     """
-    def __init__(self, device='cpu'):
-        self.device = device
+    def __init__(self, device=None):
+        if device is None:
+            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        else:
+            self.device = device
         print(f"Initializing UnifiedDetector on {self.device}...")
         
         # Load models

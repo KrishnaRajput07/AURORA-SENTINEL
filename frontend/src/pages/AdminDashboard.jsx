@@ -2,20 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, Grid, Paper, Tabs, Tab, Button, List, ListItem, Chip, IconButton, useTheme, alpha, Switch, FormControlLabel, TextField, Avatar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { Shield, Users, Bell, Settings, FileText, CheckCircle, XCircle, UserPlus, Trash2, Camera, AlertCircle, Save, Activity, HardDrive, Cpu, Zap, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 import logoImage from '../assets/logo.png';
 
 const AdminDashboard = () => {
     const theme = useTheme();
+    const { operators, addOperator, deleteOperator } = useAuth();
     const [tab, setTab] = useState(0);
     const [alerts, setAlerts] = useState([
         { id: 1, type: 'Aggression', location: 'Gate 4', time: '10:45 AM', operator: 'OP-4921', status: 'Pending' },
         { id: 2, type: 'Loitering', location: 'Parking B', time: '11:02 AM', operator: 'OP-4921', status: 'Pending' },
         { id: 3, type: 'Unauthorized', location: 'Server Room', time: '11:15 AM', operator: 'OP-5502', status: 'Resolved' }
-    ]);
-
-    const [operators, setOperators] = useState([
-        { id: 'OP-4921', name: 'John Doe', status: 'Active', shifts: 'Morning' },
-        { id: 'OP-5502', name: 'Sarah Miller', status: 'Active', shifts: 'Evening' }
     ]);
 
     const [auditHistory, setAuditHistory] = useState([]);
@@ -29,10 +26,28 @@ const AdminDashboard = () => {
         latency: 125
     });
 
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setSystemMetrics(prev => ({
+                cpu: Math.min(100, Math.max(0, prev.cpu + (Math.random() * 4 - 2))),
+                gpu: Math.min(100, Math.max(0, prev.gpu + (Math.random() * 2 - 1))),
+                ram: Math.min(100, Math.max(0, prev.ram + (Math.random() * 0.4 - 0.2))),
+                latency: Math.min(500, Math.max(20, prev.latency + Math.floor(Math.random() * 10 - 5)))
+            }));
+        }, 2000);
+        return () => clearInterval(interval);
+    }, []);
+
     const [openAddOp, setOpenAddOp] = useState(false);
-    const [newOp, setNewOp] = useState({ id: `OP-${Math.floor(Math.random() * 9000) + 1000}`, name: '', shifts: 'Morning' });
+    const [newOp, setNewOp] = useState({
+        id: `OP-${Math.floor(Math.random() * 9000) + 1000}`,
+        name: '',
+        shifts: 'Morning',
+        securityKey: ''
+    });
     const [isExporting, setIsExporting] = useState(false);
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
+    const [addOpError, setAddOpError] = useState({ name: false, securityKey: false });
 
     const handleExportReport = () => {
         setIsExporting(true);
@@ -43,10 +58,26 @@ const AdminDashboard = () => {
     };
 
     const handleAddOperator = () => {
-        if (!newOp.name) return;
-        setOperators([...operators, { ...newOp, status: 'Active' }]);
+        const errors = {
+            name: !newOp.name,
+            securityKey: !newOp.securityKey
+        };
+        setAddOpError(errors);
+
+        if (errors.name || errors.securityKey) {
+            setNotification({ open: true, message: 'Please fill in all required fields.', severity: 'error' });
+            return;
+        }
+
+        addOperator(newOp);
         setOpenAddOp(false);
-        setNewOp({ id: `OP-${Math.floor(Math.random() * 9000) + 1000}`, name: '', shifts: 'Morning' });
+        setNewOp({
+            id: `OP-${Math.floor(Math.random() * 9000) + 1000}`,
+            name: '',
+            shifts: 'Morning',
+            securityKey: ''
+        });
+        setAddOpError({ name: false, securityKey: false });
         setNotification({ open: true, message: 'New operator added to roster.', severity: 'success' });
     };
 
@@ -126,10 +157,10 @@ const AdminDashboard = () => {
     const ResourceMonitor = () => (
         <Grid container spacing={2} sx={{ mb: 4 }}>
             {[
-                { label: 'CPU Load', value: `${systemMetrics.cpu}%`, icon: <Cpu />, color: theme.palette.primary.main },
-                { label: 'GPU Usage', value: `${systemMetrics.gpu}%`, icon: <Zap />, color: theme.palette.secondary.main },
-                { label: 'Memory', value: `${systemMetrics.ram}%`, icon: <HardDrive />, color: '#805AD5' },
-                { label: 'Latency', value: `${systemMetrics.latency}ms`, icon: <Activity />, color: theme.palette.error.main },
+                { label: 'CPU Load', value: `${Math.round(systemMetrics.cpu)}%`, icon: <Cpu />, color: theme.palette.primary.main },
+                { label: 'GPU Usage', value: `${Math.round(systemMetrics.gpu)}%`, icon: <Zap />, color: theme.palette.secondary.main },
+                { label: 'Memory', value: `${Math.round(systemMetrics.ram)}%`, icon: <HardDrive />, color: '#805AD5' },
+                { label: 'Latency', value: `${Math.round(systemMetrics.latency)}ms`, icon: <Activity />, color: theme.palette.error.main },
             ].map((m, i) => (
                 <Grid item xs={6} md={3} key={i}>
                     <Paper variant="outlined" sx={{ p: 2, borderRadius: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -255,7 +286,13 @@ const AdminDashboard = () => {
                                                 <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>ID: {op.id} | Shift: {op.shifts}</Typography>
                                             </Box>
                                             <Box>
-                                                <IconButton color="error" sx={{ bgcolor: alpha(theme.palette.error.main, 0.05) }}><Trash2 size={20} /></IconButton>
+                                                <IconButton
+                                                    color="error"
+                                                    sx={{ bgcolor: alpha(theme.palette.error.main, 0.05) }}
+                                                    onClick={() => deleteOperator(op.id)}
+                                                >
+                                                    <Trash2 size={20} />
+                                                </IconButton>
                                             </Box>
                                         </Paper>
                                     </Grid>
@@ -319,13 +356,30 @@ const AdminDashboard = () => {
                             fullWidth
                             autoFocus
                             value={newOp.name}
-                            onChange={(e) => setNewOp({ ...newOp, name: e.target.value })}
+                            onChange={(e) => {
+                                setNewOp({ ...newOp, name: e.target.value });
+                                if (e.target.value) setAddOpError(prev => ({ ...prev, name: false }));
+                            }}
+                            error={addOpError.name}
+                            helperText={addOpError.name ? "Name is required" : ""}
                         />
                         <TextField
                             label="Operator ID"
                             fullWidth
                             value={newOp.id}
                             disabled
+                        />
+                        <TextField
+                            label="Security Key"
+                            fullWidth
+                            type="password"
+                            value={newOp.securityKey}
+                            onChange={(e) => {
+                                setNewOp({ ...newOp, securityKey: e.target.value });
+                                if (e.target.value) setAddOpError(prev => ({ ...prev, securityKey: false }));
+                            }}
+                            error={addOpError.securityKey}
+                            helperText={addOpError.securityKey ? "Security Key is required" : ""}
                         />
                         <TextField
                             select
