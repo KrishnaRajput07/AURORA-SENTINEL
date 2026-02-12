@@ -15,6 +15,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import NetworkStatusIndicator from './components/NetworkStatusIndicator';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { IntelligenceProvider } from './context/IntelligenceContext';
 import { SettingsProvider } from './context/SettingsContext';
 
 const ProtectedRoute = ({ children, roles }) => {
@@ -88,8 +89,10 @@ function App() {
             <AuthProvider>
                 <NotificationProvider>
                     <SettingsProvider>
-                        <NetworkStatusIndicator />
-                        <AppContent />
+                        <IntelligenceProvider>
+                            <NetworkStatusIndicator />
+                            <AppContent />
+                        </IntelligenceProvider>
                     </SettingsProvider>
                 </NotificationProvider>
             </AuthProvider>

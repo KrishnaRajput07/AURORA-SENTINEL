@@ -32,12 +32,13 @@ class RiskScoringEngine:
         
         # Balanced weights (Sum = 1.0) as per Innovation Spec
         self.weights = {
-            'aggressive_posture': 0.25,
-            'proximity_violation': 0.20,
-            'unattended_object': 0.20,
-            'loitering': 0.15,
-            'crowd_density': 0.10,
-            'contextual': 0.10
+            'weapon_detection': 0.45,   # High priority
+            'aggressive_posture': 0.15,
+            'proximity_violation': 0.10,
+            'unattended_object': 0.15,
+            'loitering': 0.05,
+            'crowd_density': 0.05,
+            'contextual': 0.05
         }
         
         # Time-Based Thresholds (Seconds)
@@ -74,6 +75,7 @@ class RiskScoringEngine:
         factors = {}
         
         # 1. Analyze Individual Factors
+        factors['weapon_detection'] = self._analyze_weapons(detection_data.get('weapons', []))
         factors['aggressive_posture'] = self._analyze_aggression(detection_data['poses'])
         factors['proximity_violation'] = self._check_proximity(detection_data['poses'])
         factors['loitering'] = self._detect_loitering(detection_data['objects'])
@@ -86,18 +88,31 @@ class RiskScoringEngine:
             factors['contextual'] = 0.0
             
         # 2. Multi-Signal Validation
-        high_risk_count = sum(1 for v in factors.values() if v > 0.5)
-        
-        # If we have a VERY high signal in aggression, avoid suppression
-        if factors.get('aggressive_posture', 0) > 0.75:
+        # If a weapon is detected, we always want high risk, regardless of other factors
+        if factors['weapon_detection'] > 0.5:
             suppression_factor = 1.0
-        elif high_risk_count < 2 and factors['unattended_object'] < 0.5:
-            suppression_factor = 0.7  
         else:
-            suppression_factor = 1.0
+            high_risk_count = sum(1 for v in factors.values() if v > 0.5)
+            
+            # If we have a VERY high signal in aggression, avoid suppression
+            if factors.get('aggressive_posture', 0) > 0.75:
+                suppression_factor = 1.0
+            elif high_risk_count < 2 and factors['unattended_object'] < 0.5:
+                suppression_factor = 0.7  
+            else:
+                suppression_factor = 1.0
             
         # 3. Calculate Weighted Sum
         raw_score = sum(factors[k] * self.weights.get(k, 0) for k in factors)
+        
+        # WEAPON ESCALATION (NEW): 
+        # If a weapon is detected, we want to skip standard weighing and 
+        # immediately escalate to a critical level.
+        if factors.get('weapon_detection', 0) > 0.3:
+            # Ensure at least 80% risk if a weapon is even slightly visible
+            # Scales to 100% with weapon confidence
+            raw_score = max(raw_score, 0.8 + (factors['weapon_detection'] * 0.2))
+            suppression_factor = 1.0 # Never suppress a weapon threat
         
         # Apply suppression
         final_risk_score = raw_score * suppression_factor
@@ -108,6 +123,13 @@ class RiskScoringEngine:
         
         # Return percentage (0-100)
         return min(100.0, smoothed_score * 100), factors
+
+    def _analyze_weapons(self, weapons):
+        """Analyze weapon detections for risk impact"""
+        if not weapons:
+            return 0.0
+        # Return the highest confidence weapon detection
+        return max([w['confidence'] for w in weapons]) if weapons else 0.0
 
     def _update_history(self, poses):
         """Update movement history for tracked persons"""
@@ -404,6 +426,8 @@ class RiskScoringEngine:
         """
         active_threats = []
         
+        if factors.get('weapon_detection', 0) > 0.5:
+            active_threats.append('WEAPON DETECTED')
         if factors.get('aggressive_posture', 0) > 0.5:
             active_threats.append('aggressive behavior detected')
         if factors.get('proximity_violation', 0) > 0.5:
@@ -418,7 +442,9 @@ class RiskScoringEngine:
         if not active_threats:
             return 'Low risk situation'
         
-        if score >= 75:
+        if factors.get('weapon_detection', 0) > 0.5:
+            return f"CRITICAL THREAT: {', '.join(active_threats)}"
+        elif score >= 75:
             return f"CRITICAL: {', '.join(active_threats)}"
         elif score >= 50:
             return f"HIGH RISK: {', '.join(active_threats)}"

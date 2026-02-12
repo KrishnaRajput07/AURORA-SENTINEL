@@ -76,6 +76,16 @@ async def process_video_file_task(video_path: str):
                 for obj in det['objects']:
                     b = obj['bbox']
                     cv2.rectangle(frame, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 0), 2)
+                
+                # Draw Weapons (NEW)
+                if 'weapons' in det:
+                    for weapon in det['weapons']:
+                        b = weapon['bbox']
+                        conf = weapon['confidence']
+                        cv2.rectangle(frame, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (0, 0, 255), 3)
+                        cv2.putText(frame, f"WEAPON {int(conf*100)}%", (int(b[0]), int(b[1])-10), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
                 for p in det['poses']:
                     draw_skeleton(frame, np.array(p['keypoints']), np.array(p['confidence']))
                 

@@ -1,18 +1,22 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import { Box, Typography, Paper, Grid, Button, IconButton, LinearProgress, Drawer, List, ListItem, alpha, useTheme, Chip, Divider, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { Upload, FileVideo, X, Play, Shield, Search, ChevronRight, AlertTriangle, CheckCircle2, Clock, Activity, Users, Target, Rewind, Maximize2, FileText } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useIntelligence } from '../context/IntelligenceContext';
 
 const Intelligence = () => {
-    const [file, setFile] = useState(null);
-    const [uploading, setUploading] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [analysisResult, setAnalysisResult] = useState(null);
-    const [drawerOpen, setDrawerOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('summary');
-    const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
+    const {
+        file, setFile,
+        uploading, setUploading,
+        progress, setProgress,
+        analysisResult, setAnalysisResult,
+        drawerOpen, setDrawerOpen,
+        notification, setNotification
+    } = useIntelligence();
+
+    // const [activeTab, setActiveTab] = useState('summary'); // Not used in render?
     const videoRef = useRef(null);
     const theme = useTheme();
 

@@ -148,19 +148,32 @@ async def websocket_live_feed(websocket: WebSocket):
                 anon_frame = frame
             
             # DRAWING: Draw Tracking Overlays
-            if detection and 'objects' in detection:
-                for obj in detection['objects']:
-                    x1, y1, x2, y2 = map(int, obj['bbox'])
-                    track_id = obj.get('track_id', -1)
-                    cls_name = obj.get('class', 'obj')
-                    
-                    color = (0, 255, 0)
-                    if track_id != -1:
-                        np.random.seed(int(track_id))
-                        color = np.random.randint(0, 255, size=3).tolist()
-                    
-                    cv2.rectangle(anon_frame, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(anon_frame, f"{cls_name} {track_id if track_id!=-1 else ''}", (x1, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            if detection:
+                # Draw Objects
+                if 'objects' in detection:
+                    for obj in detection['objects']:
+                        x1, y1, x2, y2 = map(int, obj['bbox'])
+                        track_id = obj.get('track_id', -1)
+                        cls_name = obj.get('class', 'obj')
+                        
+                        color = (0, 255, 0)
+                        if track_id != -1:
+                            np.random.seed(int(track_id))
+                            color = np.random.randint(0, 255, size=3).tolist()
+                        
+                        cv2.rectangle(anon_frame, (x1, y1), (x2, y2), color, 2)
+                        cv2.putText(anon_frame, f"{cls_name} {track_id if track_id!=-1 else ''}", (x1, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+                # Draw Weapons (NEW)
+                if 'weapons' in detection:
+                    for weapon in detection['weapons']:
+                        x1, y1, x2, y2 = map(int, weapon['bbox'])
+                        conf = weapon['confidence']
+                        
+                        # Use Red for weapons
+                        color = (0, 0, 255)
+                        cv2.rectangle(anon_frame, (x1, y1), (x2, y2), color, 3)
+                        cv2.putText(anon_frame, f"WEAPON {int(conf*100)}%", (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
             # Encode frame
             _, buffer = cv2.imencode('.jpg', anon_frame)
@@ -173,7 +186,8 @@ async def websocket_live_feed(websocket: WebSocket):
                     "alert": alert,
                     "detections": {
                         "person_count": len(detection.get('poses', [])),
-                        "object_count": len(detection.get('objects', []))
+                        "object_count": len(detection.get('objects', [])),
+                        "weapon_count": len(detection.get('weapons', []))
                     }
                 })
                 await websocket.send_bytes(buffer.tobytes())

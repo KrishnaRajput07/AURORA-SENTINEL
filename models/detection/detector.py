@@ -25,10 +25,15 @@ class UnifiedDetector:
             self.pose_model = YOLO('yolov8n-pose.pt')
             self.pose_model.to(device)
             
+            # Weapon detection model (NEW)
+            self.weapon_model = YOLO('wepon.pt')
+            self.weapon_model.to(device)
+            
         except Exception as e:
             print(f"Warning: Failed to load models on {device}, falling back to CPU or raising error: {e}")
             self.object_model = YOLO('yolov8n.pt')
             self.pose_model = YOLO('yolov8n-pose.pt')
+            self.weapon_model = YOLO('wepon.pt')
             self.device = 'cpu'
         
         # Classes of interest
@@ -38,6 +43,10 @@ class UnifiedDetector:
             26: 'handbag',
             28: 'suitcase',
         }
+        
+        # Weapon classes (Custom model usually has different indexes, 
+        # but from weapon.py it seems to just be generalized)
+        self.weapon_classes = {0: 'weapon'} 
         
         # Initialize Simple Tracker (Fallback since YOLO track crashes on Windows)
         self.tracker = SimpleTracker()
@@ -114,6 +123,33 @@ class UnifiedDetector:
         
         return poses
     
+    def detect_weapons(self, frame):
+        """
+        Detect weapons in frame
+        Returns: list of weapon detections
+        """
+        results = self.weapon_model.predict(
+            frame, 
+            verbose=False, 
+            device=self.device,
+            conf=0.3
+        )[0]
+        
+        weapons = []
+        if results.boxes is not None:
+            for box in results.boxes:
+                cls = int(box.cls[0])
+                conf = float(box.conf[0])
+                xyxy = box.xyxy[0].cpu().numpy()
+                
+                weapons.append({
+                    'class': 'weapon',
+                    'confidence': conf,
+                    'bbox': xyxy.tolist()
+                })
+        
+        return weapons
+
     def process_frame(self, frame):
         """
         Complete detection pipeline
@@ -124,12 +160,16 @@ class UnifiedDetector:
         # 2. Run Pose Estimation
         poses = self.detect_poses(frame)
         
-        # 3. Match Poses to Tracked Objects (Critical for Risk Engine)
+        # 3. Run Weapon Detection (NEW)
+        weapons = self.detect_weapons(frame)
+        
+        # 4. Match Poses to Tracked Objects (Critical for Risk Engine)
         self._assign_tracks_to_poses(objects, poses)
         
         return {
             'objects': objects,
             'poses': poses,
+            'weapons': weapons,
             'timestamp': cv2.getTickCount() / cv2.getTickFrequency()
         }
         
