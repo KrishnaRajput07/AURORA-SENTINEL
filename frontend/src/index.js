@@ -14,11 +14,23 @@ root.render(
     </React.StrictMode>
 );
 
-// Service Worker Registration
+
+// Force Unregister any existing Service Workers and Clear Caches
+// This solves layout inconsistencies caused by stale persistent service workers.
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-            .then(reg => console.log('SW Registered:', reg.scope))
-            .catch(err => console.log('SW Registration failed:', err));
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let registration of registrations) {
+            registration.unregister();
+            console.log('Force unmasked old Service Worker:', registration);
+        }
+    });
+}
+
+if ('caches' in window) {
+    caches.keys().then((names) => {
+        for (let name of names) {
+            caches.delete(name);
+            console.log('Cleared stale cache:', name);
+        }
     });
 }

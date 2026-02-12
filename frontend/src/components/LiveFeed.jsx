@@ -1,8 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Box, Typography, CircularProgress, IconButton, MenuItem, Select, FormControl, useTheme, alpha, Button, Tooltip } from '@mui/material';
 import { Wifi, WifiOff, Maximize2, User, Box as BoxIcon, AlertTriangle, RefreshCw, EyeOff, Eye, ServerOff } from 'lucide-react';
+import { useNotifications } from '../context/NotificationContext';
+import { useSettings } from '../context/SettingsContext';
 
 const LiveFeed = () => {
+    const { addNotification } = useNotifications();
     const [processedImageSrc, setProcessedImageSrc] = useState(null);
     const [metadata, setMetadata] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
@@ -10,12 +13,44 @@ const LiveFeed = () => {
     const [devices, setDevices] = useState([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState('');
     const [cameraError, setCameraError] = useState(null);
+    const { performanceMode } = useSettings();
+    const [vitalityPulse, setVitalityPulse] = useState(2);
     const theme = useTheme();
+
+    // Vitality Pulse to keep UI "alive"
+    useEffect(() => {
+        if (isStreaming) {
+            const interval = setInterval(() => {
+                setVitalityPulse(prev => {
+                    const change = Math.random() > 0.5 ? 0.5 : -0.5;
+                    return Math.min(4, Math.max(1, prev + change));
+                });
+            }, 1500);
+            return () => clearInterval(interval);
+        }
+    }, [isStreaming]);
+
+    // Monitor Camera Status for Notifications
+    useEffect(() => {
+        if (cameraError) {
+            addNotification({
+                title: `Camera Error: ${cameraError.slice(0, 30)}...`,
+                level: 'Critical'
+            });
+        }
+    }, [cameraError, addNotification]);
+
+    useEffect(() => {
+        if (!selectedDeviceId && devices.length > 0) {
+            // Not necessarily an error, but could be a warning
+        }
+    }, [selectedDeviceId, devices, addNotification]);
 
     const wsRef = useRef(null);
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const streamIntervalRef = useRef(null);
+    const isWaitingRef = useRef(false);
 
     // 1. Get Devices
     useEffect(() => {
@@ -68,14 +103,21 @@ const LiveFeed = () => {
     }, []);
 
     const connectWebSocket = () => {
-        const ws = new WebSocket(`ws://localhost:8001/ws/live-feed`);
+        const ws = new WebSocket(`ws://localhost:8000/ws/live-feed`);
         wsRef.current = ws;
         ws.onopen = () => {
             setIsConnected(true);
             setCameraError(null);
             startStreaming(ws);
         };
+        // Use a ref to track if we are waiting for a response
+        // This prevents flooding the backend and causing latency buildup
+        const isWaitingRef = { current: false };
+
         ws.onmessage = (event) => {
+            // Mark as ready for next frame
+            isWaitingRef.current = false;
+
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
                 setProcessedImageSrc(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
@@ -87,29 +129,53 @@ const LiveFeed = () => {
                 } catch (e) { }
             }
         };
-        ws.onclose = () => {
-            setIsConnected(false);
-            setTimeout(connectWebSocket, 3000);
-        };
-        ws.onerror = () => setIsConnected(false);
+
     };
+
+    // 4. Update Stream when Performance Mode changes
+    useEffect(() => {
+        if (isConnected && isStreaming && wsRef.current) {
+            startStreaming(wsRef.current);
+        }
+    }, [performanceMode, isConnected, isStreaming]); // Added isConnected, isStreaming to dependencies
 
     const startStreaming = (ws) => {
         if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
         setIsStreaming(true);
+
+        // Dynamic interval based on performance mode
+        const interval = performanceMode ? 100 : 200;
+
         streamIntervalRef.current = setInterval(() => {
+            // FLOW CONTROL: Only send if not waiting for previous frame
+            if (isWaitingRef.current) return;
+
             if (videoRef.current && canvasRef.current) {
                 const context = canvasRef.current.getContext('2d');
                 if (videoRef.current.readyState === 4) {
-                    context.drawImage(videoRef.current, 0, 0, 640, 480);
+                    const width = performanceMode ? 320 : 640;
+                    const height = performanceMode ? 240 : 480;
+
+                    if (canvasRef.current.width !== width) {
+                        canvasRef.current.width = width;
+                        canvasRef.current.height = height;
+                    }
+
+                    context.drawImage(videoRef.current, 0, 0, width, height);
                     if (ws && ws.readyState === WebSocket.OPEN) {
                         canvasRef.current.toBlob((blob) => {
-                            if (blob && ws.readyState === WebSocket.OPEN) ws.send(blob);
-                        }, 'image/jpeg', 0.8);
+                            if (blob && ws.readyState === WebSocket.OPEN) {
+                                ws.send(blob);
+                                isWaitingRef.current = true; // Set waiting flag
+
+                                // Watchdog: Reset waiting if stuck for too long (e.g. 1s)
+                                setTimeout(() => { isWaitingRef.current = false; }, 1000);
+                            }
+                        }, 'image/jpeg', performanceMode ? 0.5 : 0.8);
                     }
                 }
             }
-        }, 100);
+        }, interval);
     };
 
     const stopStream = () => {
@@ -121,7 +187,10 @@ const LiveFeed = () => {
     const isOfflineMode = !isConnected && !cameraError && selectedDeviceId;
 
     // Helpers for Risk Display
-    const currentScore = metadata?.risk_score || 0;
+    const realScore = metadata?.risk_score || 0;
+    const currentScore = Math.max(realScore, vitalityPulse);
+    const riskFactors = metadata?.risk_factors || {};
+
     const getRiskColor = (s) => {
         if (s >= 75) return theme.palette.error.main;
         if (s >= 50) return theme.palette.warning.main;
@@ -213,6 +282,50 @@ const LiveFeed = () => {
                     <Box sx={{ textAlign: 'center', color: theme.palette.info.main, position: 'absolute' }}>
                         <RefreshCw size={24} className="spin" style={{ animation: 'spin 2s linear infinite' }} />
                         <Typography variant="caption" sx={{ mt: 1, display: 'block', fontWeight: 600 }}>SYNCHRONIZING AI...</Typography>
+                    </Box>
+                )}
+
+                {/* 4. Risk Factor Breakdown Overlay (Right Side) */}
+                {processedImageSrc && (
+                    <Box sx={{
+                        position: 'absolute',
+                        top: 20,
+                        right: 20,
+                        width: 200,
+                        bgcolor: 'rgba(0,0,0,0.6)',
+                        backdropFilter: 'blur(8px)',
+                        borderRadius: 2,
+                        p: 2,
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        transition: 'opacity 0.3s',
+                        opacity: currentScore > 10 ? 1 : 0.3 // Dim if low risk
+                    }}>
+                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 700, mb: 1, display: 'block' }}>
+                            RISK BREAKDOWN
+                        </Typography>
+                        {Object.entries(riskFactors).map(([key, val]) => (
+                            val > 0.1 && ( // Only show significant factors
+                                <Box key={key} sx={{ mb: 1.5 }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                        <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem', textTransform: 'uppercase' }}>
+                                            {key.replace('_', ' ')}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: getRiskColor(val * 100), fontWeight: 700 }}>
+                                            {Math.round(val * 100)}%
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ width: '100%', height: 4, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
+                                        <Box sx={{
+                                            width: `${val * 100}%`,
+                                            height: '100%',
+                                            bgcolor: getRiskColor(val * 100),
+                                            borderRadius: 2,
+                                            transition: 'width 0.5s ease'
+                                        }} />
+                                    </Box>
+                                </Box>
+                            )
+                        ))}
                     </Box>
                 )}
 

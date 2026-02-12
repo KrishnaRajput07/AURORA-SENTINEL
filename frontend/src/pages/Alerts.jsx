@@ -13,7 +13,7 @@ const AlertsPage = () => {
 
     const fetchAlerts = async () => {
         try {
-            const response = await fetch('http://localhost:8001/alerts/recent?limit=100');
+            const response = await fetch('http://localhost:8000/alerts/recent?limit=100');
             const data = await response.json();
             setAlerts(data.alerts);
         } catch (error) {

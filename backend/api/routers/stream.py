@@ -76,11 +76,18 @@ async def websocket_live_feed(websocket: WebSocket):
             if frame is None:
                 continue
             
-            # Optimization: Force Resize
-            frame = cv2.resize(frame, (640, 480))
+            # Optimization: Use native resolution (do not force upscale)
+            # frame = cv2.resize(frame, (640, 480)) 
 
             # Process every Nth frame
-            if frame_count % (SKIP_FRAMES + 1) == 0:
+            # Only skip if we are processing faster than input (simple logic for now: process all or skip less)
+            # If input is 320x240 (Performance Mode), we can process every frame or every 2nd frame.
+            
+            # Dynamic Skip: If frame is small, skip less
+            height, width = frame.shape[:2]
+            CURRENT_SKIP = 0 if width <= 320 else SKIP_FRAMES
+
+            if frame_count % (CURRENT_SKIP + 1) == 0:
                 try:
                     # 1. Detect Objects/Poses
                     detection = ml_service.detector.process_frame(frame)
@@ -97,6 +104,8 @@ async def websocket_live_feed(websocket: WebSocket):
                     alert = None
                     if risk_score > 50:
                         alert = ml_service.risk_engine.generate_alert(risk_score, risk_factors)
+                        # Ensure level is uppercase for consistency
+                        alert['level'] = alert['level'].upper()
                         
                         # SMART STORAGE: Trigger recording for significant threats
                         if risk_score > 70:
@@ -146,19 +155,43 @@ async def websocket_live_feed(websocket: WebSocket):
                 anon_frame = frame
             
             # DRAWING: Draw Tracking Overlays
-            if detection and 'objects' in detection:
-                for obj in detection['objects']:
-                    x1, y1, x2, y2 = map(int, obj['bbox'])
-                    track_id = obj.get('track_id', -1)
-                    cls_name = obj.get('class', 'obj')
-                    
-                    color = (0, 255, 0)
-                    if track_id != -1:
-                        np.random.seed(int(track_id))
-                        color = np.random.randint(0, 255, size=3).tolist()
-                    
-                    cv2.rectangle(anon_frame, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(anon_frame, f"{cls_name} {track_id if track_id!=-1 else ''}", (x1, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            if detection:
+                # Draw Objects
+                if 'objects' in detection:
+                    for obj in detection['objects']:
+                        x1, y1, x2, y2 = map(int, obj['bbox'])
+                        track_id = obj.get('track_id', -1)
+                        cls_name = obj.get('class', 'obj')
+                        
+                        # VISUALIZATION FIX: Highlight weapons from standard model
+                        is_weapon = cls_name in ['knife', 'baseball bat', 'scissors', 'gun']
+                        
+                        if is_weapon:
+                            color = (0, 0, 255) # Red for weapons
+                            thickness = 3
+                            label = f"THREAT: {cls_name.upper()}"
+                        else:
+                            # Standard Object Logic
+                            color = (0, 255, 0)
+                            thickness = 2
+                            label = f"{cls_name} {track_id if track_id!=-1 else ''}"
+                            if track_id != -1:
+                                np.random.seed(int(track_id))
+                                color = np.random.randint(0, 255, size=3).tolist()
+                        
+                        cv2.rectangle(anon_frame, (x1, y1), (x2, y2), color, thickness)
+                        cv2.putText(anon_frame, label, (x1, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+                # Draw Weapons (NEW)
+                if 'weapons' in detection:
+                    for weapon in detection['weapons']:
+                        x1, y1, x2, y2 = map(int, weapon['bbox'])
+                        conf = weapon['confidence']
+                        
+                        # Use Red for weapons
+                        color = (0, 0, 255)
+                        cv2.rectangle(anon_frame, (x1, y1), (x2, y2), color, 3)
+                        cv2.putText(anon_frame, f"WEAPON {int(conf*100)}%", (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
             # Encode frame
             _, buffer = cv2.imencode('.jpg', anon_frame)
@@ -167,10 +200,12 @@ async def websocket_live_feed(websocket: WebSocket):
             try:
                 await websocket.send_json({
                     "risk_score": risk_score,
+                    "risk_factors": risk_factors, # Added detailed factors
                     "alert": alert,
                     "detections": {
                         "person_count": len(detection.get('poses', [])),
-                        "object_count": len(detection.get('objects', []))
+                        "object_count": len(detection.get('objects', [])),
+                        "weapon_count": len(detection.get('weapons', []))
                     }
                 })
                 await websocket.send_bytes(buffer.tobytes())

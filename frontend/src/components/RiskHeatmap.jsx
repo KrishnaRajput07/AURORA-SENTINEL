@@ -24,6 +24,7 @@ const RiskHeatmap = ({ alerts }) => {
         { id: 'CAM-002', lat: 28.5365, lng: 77.3920, name: 'North Wing Corridor' },
         { id: 'CAM-003', lat: 28.5345, lng: 77.3900, name: 'South Parking Zone' },
         { id: 'CAM-004', lat: 28.5375, lng: 77.3930, name: 'Loading Dock Area' },
+        { id: 'FORENSIC-01', lat: 28.5350, lng: 77.3935, name: 'Forensic Lab Unit' },
     ];
 
     const getCameraRisk = (cameraId) => {
