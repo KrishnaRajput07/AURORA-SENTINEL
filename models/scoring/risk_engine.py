@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.spatial.distance import euclidean
 from collections import deque, defaultdict
 import math
 
@@ -55,7 +54,9 @@ class RiskScoringEngine:
         Main pipeline: Detection -> Factor Analysis -> Multi-Signal Validation -> Score
         """
         # 0. Calibration Phase
-        current_time = context.get('timestamp', 0) if context else 0
+        import time
+        # Prefer context timestamp (from video), fallback to detection timestamp, then system time
+        current_time = context.get('timestamp') if context else detection_data.get('timestamp', time.time())
         self._current_timestamp = current_time # Internal state for helpers
         if self.start_time is None: self.start_time = current_time
         
@@ -75,7 +76,10 @@ class RiskScoringEngine:
         factors = {}
         
         # 1. Analyze Individual Factors
-        factors['weapon_detection'] = self._analyze_weapons(detection_data.get('weapons', []))
+        factors['weapon_detection'] = self._analyze_weapons(
+            detection_data.get('weapons', []), 
+            detection_data.get('objects', [])
+        )
         factors['aggressive_posture'] = self._analyze_aggression(detection_data['poses'])
         factors['proximity_violation'] = self._check_proximity(detection_data['poses'])
         factors['loitering'] = self._detect_loitering(detection_data['objects'])
@@ -111,6 +115,7 @@ class RiskScoringEngine:
         if factors.get('weapon_detection', 0) > 0.3:
             # Ensure at least 80% risk if a weapon is even slightly visible
             # Scales to 100% with weapon confidence
+            print(f"DEBUG: Weapon Detected! Confidence: {factors['weapon_detection']:.2f}, Escalating Score...")
             raw_score = max(raw_score, 0.8 + (factors['weapon_detection'] * 0.2))
             suppression_factor = 1.0 # Never suppress a weapon threat
         
@@ -118,18 +123,36 @@ class RiskScoringEngine:
         final_risk_score = raw_score * suppression_factor
         
         # 4. Temporal Smoothing (avoid flickering)
-        self.risk_history.append(final_risk_score)
-        smoothed_score = np.mean(self.risk_history)
+        # CRITICAL FIX: If weapon detected, bypass smoothing for INSTANT alert
+        if factors.get('weapon_detection', 0) > 0.3:
+             # Fill history with current score to maintain high alert state
+             for _ in range(self.risk_history.maxlen):
+                 self.risk_history.append(final_risk_score)
+             smoothed_score = final_risk_score
+        else:
+             self.risk_history.append(final_risk_score)
+             smoothed_score = np.mean(self.risk_history)
         
         # Return percentage (0-100)
         return min(100.0, smoothed_score * 100), factors
 
-    def _analyze_weapons(self, weapons):
+    def _analyze_weapons(self, weapons, objects=None):
         """Analyze weapon detections for risk impact"""
-        if not weapons:
-            return 0.0
-        # Return the highest confidence weapon detection
-        return max([w['confidence'] for w in weapons]) if weapons else 0.0
+        max_conf = 0.0
+        
+        # 1. Check Custom Model Detections (Guns, etc.)
+        if weapons:
+            max_conf = max([w['confidence'] for w in weapons])
+            
+        # 2. Check Standard Model Detections (Knives, Bats)
+        if objects:
+            weapon_types = ['knife', 'baseball bat', 'scissors']
+            for obj in objects:
+                if obj.get('class') in weapon_types:
+                    # Boost confidence slightly for these explicit threats being present
+                    max_conf = max(max_conf, obj.get('confidence', 0.5))
+                    
+        return max_conf
 
     def _update_history(self, poses):
         """Update movement history for tracked persons"""
@@ -190,9 +213,16 @@ class RiskScoringEngine:
             
             # Feature 2: Hands near head (Defensive/Fighting)
             # Use height-based threshold instead of fixed pixels
-            nose = kpts[0]
+            nose = np.array(kpts[0])
+            wrist_l = np.array(kpts[9])
+            wrist_r = np.array(kpts[10])
+            shoulder_l = np.array(kpts[5])
+            shoulder_r = np.array(kpts[6])
+
             head_proximity_threshold = person_height * 0.25  # 25% of body height
-            if euclidean(kpts[9], nose) < head_proximity_threshold or euclidean(kpts[10], nose) < head_proximity_threshold:
+            
+            if np.linalg.norm(wrist_l - nose) < head_proximity_threshold or \
+               np.linalg.norm(wrist_r - nose) < head_proximity_threshold:
                 if not is_moving:
                     aggression += 0.7 # High threat if stationary with hands near head
                 else:
@@ -201,8 +231,8 @@ class RiskScoringEngine:
             # Feature 3: Strike Detection (Extended Arm)
             # Detect if arm is fully extended (wrist far from shoulder)
             # Index 5-9 (L-Shldr, L-Wrist), 6-10 (R-Shldr, R-Wrist)
-            left_arm_ext = euclidean(kpts[9], kpts[5]) > (person_height * 0.4)
-            right_arm_ext = euclidean(kpts[10], kpts[6]) > (person_height * 0.4)
+            left_arm_ext = np.linalg.norm(wrist_l - shoulder_l) > (person_height * 0.4)
+            right_arm_ext = np.linalg.norm(wrist_r - shoulder_r) > (person_height * 0.4)
             
             if left_arm_ext or right_arm_ext:
                 aggression += 0.4 # Potential punch or strike

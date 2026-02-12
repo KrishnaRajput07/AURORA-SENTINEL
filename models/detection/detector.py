@@ -42,6 +42,8 @@ class UnifiedDetector:
             24: 'backpack',
             26: 'handbag',
             28: 'suitcase',
+            34: 'baseball bat',
+            43: 'knife',
         }
         
         # Weapon classes (Custom model usually has different indexes, 

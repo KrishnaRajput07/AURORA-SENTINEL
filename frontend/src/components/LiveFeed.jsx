@@ -50,6 +50,7 @@ const LiveFeed = () => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const streamIntervalRef = useRef(null);
+    const isWaitingRef = useRef(false);
 
     // 1. Get Devices
     useEffect(() => {
@@ -109,7 +110,14 @@ const LiveFeed = () => {
             setCameraError(null);
             startStreaming(ws);
         };
+        // Use a ref to track if we are waiting for a response
+        // This prevents flooding the backend and causing latency buildup
+        const isWaitingRef = { current: false };
+
         ws.onmessage = (event) => {
+            // Mark as ready for next frame
+            isWaitingRef.current = false;
+
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
                 setProcessedImageSrc(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
@@ -121,11 +129,7 @@ const LiveFeed = () => {
                 } catch (e) { }
             }
         };
-        ws.onclose = () => {
-            setIsConnected(false);
-            setTimeout(connectWebSocket, 3000);
-        };
-        ws.onerror = () => setIsConnected(false);
+
     };
 
     // 4. Update Stream when Performance Mode changes
@@ -133,23 +137,25 @@ const LiveFeed = () => {
         if (isConnected && isStreaming && wsRef.current) {
             startStreaming(wsRef.current);
         }
-    }, [performanceMode]);
+    }, [performanceMode, isConnected, isStreaming]); // Added isConnected, isStreaming to dependencies
 
     const startStreaming = (ws) => {
         if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
         setIsStreaming(true);
 
         // Dynamic interval based on performance mode
-        const interval = performanceMode ? 500 : 250;
+        const interval = performanceMode ? 100 : 200;
 
         streamIntervalRef.current = setInterval(() => {
+            // FLOW CONTROL: Only send if not waiting for previous frame
+            if (isWaitingRef.current) return;
+
             if (videoRef.current && canvasRef.current) {
                 const context = canvasRef.current.getContext('2d');
                 if (videoRef.current.readyState === 4) {
                     const width = performanceMode ? 320 : 640;
                     const height = performanceMode ? 240 : 480;
 
-                    // Match canvas dimensions to target resolution
                     if (canvasRef.current.width !== width) {
                         canvasRef.current.width = width;
                         canvasRef.current.height = height;
@@ -158,7 +164,13 @@ const LiveFeed = () => {
                     context.drawImage(videoRef.current, 0, 0, width, height);
                     if (ws && ws.readyState === WebSocket.OPEN) {
                         canvasRef.current.toBlob((blob) => {
-                            if (blob && ws.readyState === WebSocket.OPEN) ws.send(blob);
+                            if (blob && ws.readyState === WebSocket.OPEN) {
+                                ws.send(blob);
+                                isWaitingRef.current = true; // Set waiting flag
+
+                                // Watchdog: Reset waiting if stuck for too long (e.g. 1s)
+                                setTimeout(() => { isWaitingRef.current = false; }, 1000);
+                            }
                         }, 'image/jpeg', performanceMode ? 0.5 : 0.8);
                     }
                 }
