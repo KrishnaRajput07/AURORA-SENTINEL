@@ -21,7 +21,13 @@ class GeminiProvider(VLMProvider):
 
     def analyze(self, image, prompt):
         if not hasattr(self, 'model'):
-             return {"error": "Gemini not configured"}
+             # Lazy check: Try to load again (maybe env loaded late)
+             api_key = os.getenv("GEMINI_API_KEY")
+             if api_key:
+                 genai.configure(api_key=api_key)
+                 self.model = genai.GenerativeModel('gemini-2.0-flash')
+             else:
+                 return "Error: Gemini not configured (Check .env)"
         
         try:
             # Gemini accepts PIL images directly

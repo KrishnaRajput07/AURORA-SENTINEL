@@ -1,12 +1,12 @@
+from dotenv import load_dotenv
+load_dotenv() # MUST BE FIRST
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db.database import engine, Base
 from backend.api.routers import alerts, analytics, video, stream, archive, stream_vlm
 from backend.services.ml_service import ml_service
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # Create tables
 Base.metadata.create_all(bind=engine)
