@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Box, Typography, useTheme, alpha, MenuItem, Select, FormControl } from '@mui/material';
-import { User, Box as BoxIcon, RefreshCw } from 'lucide-react';
+import { Box, Typography, useTheme, alpha, MenuItem, Select, FormControl, Switch, FormControlLabel, Fade } from '@mui/material';
+import { User, Box as BoxIcon, RefreshCw, BrainCircuit } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { useSettings } from '../context/SettingsContext';
 
@@ -12,6 +12,7 @@ const LiveFeed = () => {
     const [selectedDeviceId, setSelectedDeviceId] = useState('');
     const [cameraError, setCameraError] = useState(null);
     const { performanceMode } = useSettings();
+    const [vlmMode, setVlmMode] = useState(false); // NEW: VLM Mode State
     const [vitalityPulse, setVitalityPulse] = useState(2);
     const theme = useTheme();
 
@@ -85,7 +86,9 @@ const LiveFeed = () => {
     // WebSocket & Loop
     useEffect(() => {
         const connect = () => {
-            const ws = new WebSocket(`ws://localhost:8000/ws/live-feed`);
+            // Dynamic URL based on mode
+            const url = vlmMode ? `ws://localhost:8000/vlm/vlm-feed` : `ws://localhost:8000/ws/live-feed`;
+            const ws = new WebSocket(url);
             wsRef.current = ws;
 
             ws.onopen = () => setIsConnected(true);
@@ -125,7 +128,7 @@ const LiveFeed = () => {
             if (wsRef.current) wsRef.current.close();
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
-    }, [performanceMode]);
+    }, [performanceMode, vlmMode]); // Re-connect when mode changes
 
     const animate = (time) => {
         const frameInterval = performanceMode ? 50 : 33; // ~20fps or ~30fps
@@ -186,6 +189,27 @@ const LiveFeed = () => {
                         {devices.map((d, i) => <MenuItem key={i} value={d.deviceId}>{d.label.slice(0, 20)}</MenuItem>)}
                     </Select>
                 </FormControl>
+
+                {/* VLM Toggle */}
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={vlmMode}
+                            onChange={(e) => setVlmMode(e.target.checked)}
+                            size="small"
+                            color="warning"
+                        />
+                    }
+                    label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <BrainCircuit size={14} color={vlmMode ? theme.palette.warning.main : theme.palette.text.secondary} />
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: vlmMode ? theme.palette.warning.main : theme.palette.text.secondary }}>
+                                AI CORTEX
+                            </Typography>
+                        </Box>
+                    }
+                    sx={{ mr: 0, ml: 1 }}
+                />
             </Box>
 
             <Box sx={{ flexGrow: 1, position: 'relative', bgcolor: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -199,6 +223,29 @@ const LiveFeed = () => {
                         <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>INITIALIZING AI...</Typography>
                     </Box>
                 )}
+
+
+                {/* VLM Narrative Overlay */}
+                <Fade in={vlmMode && metadata?.vlm_narrative}>
+                    <Box sx={{
+                        position: 'absolute',
+                        top: 20,
+                        left: 20,
+                        right: 20,
+                        bgcolor: 'rgba(0,0,0,0.7)',
+                        backdropFilter: 'blur(10px)',
+                        borderLeft: `4px solid ${theme.palette.warning.main}`,
+                        p: 2,
+                        borderRadius: 1
+                    }}>
+                        <Typography variant="overline" sx={{ color: theme.palette.warning.main, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <BrainCircuit size={16} /> LIVE SCENE ANALYSIS ({metadata?.provider?.toUpperCase() || 'AI'})
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#fff', fontFamily: 'monospace', lineHeight: 1.4 }}>
+                            {metadata?.vlm_narrative || "Analyzing scene components..."}
+                        </Typography>
+                    </Box>
+                </Fade>
 
 
                 <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 72, background: `linear-gradient(to top, ${alpha(getRiskColor(currentScore), 0.9)} 0%, ${alpha(getRiskColor(currentScore), 0.4)} 100%)`, backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4 }}>
