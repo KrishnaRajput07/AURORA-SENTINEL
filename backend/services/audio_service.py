@@ -61,7 +61,7 @@ class AudioService:
                 return []
                 
             duration = video.duration
-            video.audio.write_audiofile(temp_audio, verbose=False, logger=None)
+            video.audio.write_audiofile(temp_audio, logger=None)
             video.close()
             
             # 2. Load Model
