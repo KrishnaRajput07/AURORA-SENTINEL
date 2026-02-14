@@ -25,18 +25,18 @@ class UnifiedDetector:
         try:
             # Main object detection model
             self.object_model = YOLO('yolov8n.pt')
-            self.object_model.to(device)
+            self.object_model.to(self.device)
             
             # Pose estimation model
             self.pose_model = YOLO('yolov8n-pose.pt')
-            self.pose_model.to(device)
+            self.pose_model.to(self.device)
             
             # Weapon detection model (NEW)
             self.weapon_model = YOLO('wepon.pt')
-            self.weapon_model.to(device)
+            self.weapon_model.to(self.device)
             
         except Exception as e:
-            print(f"Warning: Failed to load models on {device}, falling back to CPU or raising error: {e}")
+            print(f"Warning: Failed to load models on {self.device}, falling back to CPU or raising error: {e}")
             self.object_model = YOLO('yolov8n.pt')
             self.pose_model = YOLO('yolov8n-pose.pt')
             self.weapon_model = YOLO('wepon.pt')
@@ -253,14 +253,6 @@ class UnifiedDetector:
 
 
 # Test the detector
-if __name__ == "__main__":
-    detector = UnifiedDetector()
-    
-    # Create a dummy frame
-    print("Running test on dummy frame...")
-    dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
-    results = detector.process_frame(dummy_frame)
-    print(f"Test Successful: {len(results['objects'])} objects, {len(results['poses'])} people detected.")
 
 
 class SimpleTracker:
@@ -334,4 +326,15 @@ class SimpleTracker:
         boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
         boxBArea = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
         return interArea / float(boxAArea + boxBArea - interArea + 1e-6)
+
+
+# Test the detector
+if __name__ == "__main__":
+    detector = UnifiedDetector()
+    
+    # Create a dummy frame
+    print("Running test on dummy frame...")
+    dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
+    results = detector.process_frame(dummy_frame)
+    print(f"Test Successful: {len(results['objects'])} objects, {len(results['poses'])} people detected.")
 
