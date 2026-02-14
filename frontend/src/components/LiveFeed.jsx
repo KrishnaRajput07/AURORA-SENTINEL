@@ -1,15 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Box, Typography, CircularProgress, IconButton, MenuItem, Select, FormControl, useTheme, alpha, Button, Tooltip } from '@mui/material';
-import { Wifi, WifiOff, Maximize2, User, Box as BoxIcon, AlertTriangle, RefreshCw, EyeOff, Eye, ServerOff } from 'lucide-react';
+import { Box, Typography, useTheme, alpha, MenuItem, Select, FormControl } from '@mui/material';
+import { User, Box as BoxIcon, RefreshCw } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { useSettings } from '../context/SettingsContext';
 
 const LiveFeed = () => {
     const { addNotification } = useNotifications();
-    const [processedImageSrc, setProcessedImageSrc] = useState(null);
     const [metadata, setMetadata] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
-    const [isStreaming, setIsStreaming] = useState(false);
     const [devices, setDevices] = useState([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState('');
     const [cameraError, setCameraError] = useState(null);
@@ -17,42 +15,32 @@ const LiveFeed = () => {
     const [vitalityPulse, setVitalityPulse] = useState(2);
     const theme = useTheme();
 
-    // Vitality Pulse to keep UI "alive"
-    useEffect(() => {
-        if (isStreaming) {
-            const interval = setInterval(() => {
-                setVitalityPulse(prev => {
-                    const change = Math.random() > 0.5 ? 0.5 : -0.5;
-                    return Math.min(4, Math.max(1, prev + change));
-                });
-            }, 1500);
-            return () => clearInterval(interval);
-        }
-    }, [isStreaming]);
+    const wsRef = useRef(null);
+    const videoRef = useRef(null);
+    const captureCanvasRef = useRef(null);
+    const displayCanvasRef = useRef(null);
+    const requestRef = useRef(null);
+    const isWaitingRef = useRef(false);
+    const lastFrameTimeRef = useRef(0);
 
-    // Monitor Camera Status for Notifications
+    // Vitality Pulse
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setVitalityPulse(prev => {
+                const change = Math.random() > 0.5 ? 0.5 : -0.5;
+                return Math.min(4, Math.max(1, prev + change));
+            });
+        }, 1500);
+        return () => clearInterval(interval);
+    }, []);
+
     useEffect(() => {
         if (cameraError) {
-            addNotification({
-                title: `Camera Error: ${cameraError.slice(0, 30)}...`,
-                level: 'Critical'
-            });
+            addNotification({ title: `Camera Error: ${cameraError.slice(0, 30)}...`, level: 'Critical' });
         }
     }, [cameraError, addNotification]);
 
-    useEffect(() => {
-        if (!selectedDeviceId && devices.length > 0) {
-            // Not necessarily an error, but could be a warning
-        }
-    }, [selectedDeviceId, devices, addNotification]);
-
-    const wsRef = useRef(null);
-    const videoRef = useRef(null);
-    const canvasRef = useRef(null);
-    const streamIntervalRef = useRef(null);
-    const isWaitingRef = useRef(false);
-
-    // 1. Get Devices
+    // Initialize Devices
     useEffect(() => {
         const getDevices = async () => {
             try {
@@ -62,15 +50,17 @@ const LiveFeed = () => {
                 setDevices(videoDevs);
                 if (videoDevs.length > 0 && !selectedDeviceId) setSelectedDeviceId(videoDevs[0].deviceId);
             } catch (err) {
-                console.error(err);
-                setCameraError("Camera access denied. Please check permissions.");
+                setCameraError("Camera access denied.");
             }
         };
         getDevices();
-        return () => stopStream();
+        return () => {
+            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+            if (wsRef.current) wsRef.current.close();
+        };
     }, []);
 
-    // 2. Start Camera
+    // Start Camera
     useEffect(() => {
         if (!selectedDeviceId) return;
         const startCamera = async () => {
@@ -82,353 +72,151 @@ const LiveFeed = () => {
                 window.currentStream = stream;
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
-                    await videoRef.current.play().catch(e => console.error("Auto-play blocked:", e));
+                    await videoRef.current.play();
                 }
                 setCameraError(null);
             } catch (err) {
-                console.error(err);
                 setCameraError("Failed to start camera feed.");
             }
         };
         startCamera();
     }, [selectedDeviceId]);
 
-    // 3. Connect to WebSocket
+    // WebSocket & Loop
     useEffect(() => {
-        connectWebSocket();
+        const connect = () => {
+            const ws = new WebSocket(`ws://localhost:8000/ws/live-feed`);
+            wsRef.current = ws;
+
+            ws.onopen = () => setIsConnected(true);
+            ws.onclose = () => {
+                setIsConnected(false);
+                setTimeout(connect, 3000);
+            };
+
+            ws.onmessage = async (event) => {
+                if (event.data instanceof Blob) {
+                    // Optimized: Draw directly to canvas
+                    const img = new Image();
+                    img.onload = () => {
+                        if (displayCanvasRef.current) {
+                            const ctx = displayCanvasRef.current.getContext('2d');
+                            displayCanvasRef.current.width = img.width;
+                            displayCanvasRef.current.height = img.height;
+                            ctx.drawImage(img, 0, 0);
+                        }
+                        isWaitingRef.current = false;
+                        URL.revokeObjectURL(img.src);
+                    };
+                    img.src = URL.createObjectURL(event.data);
+                } else {
+                    try {
+                        const data = JSON.parse(event.data);
+                        setMetadata(data);
+                    } catch (e) { }
+                }
+            };
+        };
+
+        connect();
+        requestRef.current = requestAnimationFrame(animate);
+
         return () => {
             if (wsRef.current) wsRef.current.close();
-            if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
+            if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
-    }, []);
+    }, [performanceMode]);
 
-    const connectWebSocket = () => {
-        const ws = new WebSocket(`ws://localhost:8000/ws/live-feed`);
-        wsRef.current = ws;
-        ws.onopen = () => {
-            setIsConnected(true);
-            setCameraError(null);
-            startStreaming(ws);
-        };
-        // Use a ref to track if we are waiting for a response
-        // This prevents flooding the backend and causing latency buildup
-        const isWaitingRef = { current: false };
-
-        ws.onmessage = (event) => {
-            // Mark as ready for next frame
-            isWaitingRef.current = false;
-
-            if (event.data instanceof Blob) {
-                const url = URL.createObjectURL(event.data);
-                setProcessedImageSrc(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
-            } else {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.error) setCameraError(`System Warning: ${data.error}`);
-                    setMetadata(prev => ({ ...data, lastUpdated: Date.now() }));
-                } catch (e) { }
-            }
-        };
-
-    };
-
-    // 4. Update Stream when Performance Mode changes
-    useEffect(() => {
-        if (isConnected && isStreaming && wsRef.current) {
-            startStreaming(wsRef.current);
+    const animate = (time) => {
+        const frameInterval = performanceMode ? 50 : 33; // ~20fps or ~30fps
+        if (time - lastFrameTimeRef.current >= frameInterval) {
+            captureAndSend();
+            lastFrameTimeRef.current = time;
         }
-    }, [performanceMode, isConnected, isStreaming]); // Added isConnected, isStreaming to dependencies
+        requestRef.current = requestAnimationFrame(animate);
+    };
 
-    const startStreaming = (ws) => {
-        if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
-        setIsStreaming(true);
+    const captureAndSend = () => {
+        if (isWaitingRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        if (!videoRef.current || videoRef.current.readyState !== 4) return;
 
-        // Dynamic interval based on performance mode
-        const interval = performanceMode ? 100 : 200;
+        const canvas = captureCanvasRef.current;
+        const video = videoRef.current;
+        if (!canvas) return;
 
-        streamIntervalRef.current = setInterval(() => {
-            // FLOW CONTROL: Only send if not waiting for previous frame
-            if (isWaitingRef.current) return;
+        const ctx = canvas.getContext('2d');
+        const width = performanceMode ? 320 : 640;
+        const height = performanceMode ? 240 : 480;
 
-            if (videoRef.current && canvasRef.current) {
-                const context = canvasRef.current.getContext('2d');
-                if (videoRef.current.readyState === 4) {
-                    const width = performanceMode ? 320 : 640;
-                    const height = performanceMode ? 240 : 480;
+        if (canvas.width !== width) {
+            canvas.width = width;
+            canvas.height = height;
+        }
 
-                    if (canvasRef.current.width !== width) {
-                        canvasRef.current.width = width;
-                        canvasRef.current.height = height;
-                    }
-
-                    context.drawImage(videoRef.current, 0, 0, width, height);
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                        canvasRef.current.toBlob((blob) => {
-                            if (blob && ws.readyState === WebSocket.OPEN) {
-                                ws.send(blob);
-                                isWaitingRef.current = true; // Set waiting flag
-
-                                // Watchdog: Reset waiting if stuck for too long (e.g. 1s)
-                                setTimeout(() => { isWaitingRef.current = false; }, 1000);
-                            }
-                        }, 'image/jpeg', performanceMode ? 0.5 : 0.8);
-                    }
-                }
+        ctx.drawImage(video, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+            if (blob && wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send(blob);
+                isWaitingRef.current = true;
             }
-        }, interval);
+        }, 'image/jpeg', performanceMode ? 0.6 : 0.82);
     };
 
-    const stopStream = () => {
-        if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
-        setIsStreaming(false);
-    };
-
-    // Determine current mode
-    const isOfflineMode = !isConnected && !cameraError && selectedDeviceId;
-
-    // Helpers for Risk Display
     const realScore = metadata?.risk_score || 0;
     const currentScore = Math.max(realScore, vitalityPulse);
-    const riskFactors = metadata?.risk_factors || {};
 
     const getRiskColor = (s) => {
         if (s >= 75) return theme.palette.error.main;
         if (s >= 50) return theme.palette.warning.main;
         if (s >= 25) return theme.palette.info.light;
         return theme.palette.success.light;
-    }
+    };
 
     return (
-        <Box sx={{
-            position: 'relative',
-            width: '100%',
-            height: '100%',
-            bgcolor: '#000',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-        }}>
-            {/* Header / Toolbar */}
-            <Box sx={{
-                height: 32,
-                bgcolor: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                px: 1.5,
-                borderBottom: `1px solid ${theme.palette.divider}`
-            }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            bgcolor: isOfflineMode ? theme.palette.warning.main : ((isConnected && isStreaming) ? theme.palette.success.main : theme.palette.error.main),
-                            boxShadow: (isConnected && isStreaming) ? `0 0 8px ${theme.palette.success.main}` : 'none'
-                        }} />
-                        <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontWeight: 700, letterSpacing: '0.05em' }}>
-                            {isOfflineMode ? 'RAW FEED' : (isStreaming ? 'LIVE FEED [ACTIVE]' : 'OFFLINE')}
-                        </Typography>
-                    </Box>
-                </Box>
-
+        <Box sx={{ position: 'relative', width: '100%', height: '100%', bgcolor: '#000', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <Box sx={{ height: 32, bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <FormControl variant="standard" sx={{ minWidth: 120 }}>
-                        <Select
-                            value={selectedDeviceId}
-                            onChange={(e) => setSelectedDeviceId(e.target.value)}
-                            disableUnderline
-                            sx={{ color: theme.palette.text.secondary, fontSize: '0.75rem', height: 24, fontWeight: 500 }}
-                        >
-                            <MenuItem value="" disabled>Select Camera</MenuItem>
-                            {devices.map((d, i) => <MenuItem key={i} value={d.deviceId}>{d.label.slice(0, 20)}...</MenuItem>)}
-                        </Select>
-                    </FormControl>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: isConnected ? theme.palette.success.main : theme.palette.error.main, boxShadow: isConnected ? `0 0 8px ${theme.palette.success.main}` : 'none' }} />
+                    <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontWeight: 700 }}>
+                        {isConnected ? 'LIVE FEED [ACTIVE]' : 'CONNECTING...'}
+                    </Typography>
                 </Box>
+                <FormControl variant="standard">
+                    <Select value={selectedDeviceId} onChange={(e) => setSelectedDeviceId(e.target.value)} disableUnderline sx={{ fontSize: '0.75rem', height: 24 }}>
+                        {devices.map((d, i) => <MenuItem key={i} value={d.deviceId}>{d.label.slice(0, 20)}</MenuItem>)}
+                    </Select>
+                </FormControl>
             </Box>
 
-            {/* Video Area */}
-            <Box sx={{ flexGrow: 1, position: 'relative', bgcolor: '#000', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflow: 'hidden' }}>
+            <Box sx={{ flexGrow: 1, position: 'relative', bgcolor: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <video ref={videoRef} hidden playsInline muted />
+                <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
+                <canvas ref={displayCanvasRef} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
 
-                {/* 1. Raw Video Element (Fallback logic improved) */}
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{
-                        // Show raw video if:
-                        // 1. Offline Mode is active
-                        // 2. OR we are connected but haven't received a frame yet (processedImageSrc is null)
-                        display: (isOfflineMode || !processedImageSrc) ? 'block' : 'none',
-                        width: '100%',
-                        height: 'auto',
-                        maxHeight: '100%',
-                        objectFit: 'contain'
-                    }}
-                />
-
-                {/* 2. Canvas (Hidden) */}
-                <canvas ref={canvasRef} width={640} height={480} style={{ display: 'none' }} />
-
-                {/* 3. Processed Feed (Visible only if valid source) */}
-                {processedImageSrc && isConnected && !cameraError && (
-                    <img src={processedImageSrc} alt="Stream" style={{ width: '100%', height: 'auto', maxHeight: '100%', objectFit: 'contain' }} />
-                )}
-
-                {/* Status Overlay: Connection Wait */}
-                {(!processedImageSrc && isConnected && !cameraError && !isOfflineMode) && (
-                    <Box sx={{ textAlign: 'center', color: theme.palette.info.main, position: 'absolute' }}>
+                {!isConnected && (
+                    <Box sx={{ position: 'absolute', textAlign: 'center', color: '#fff' }}>
                         <RefreshCw size={24} className="spin" style={{ animation: 'spin 2s linear infinite' }} />
-                        <Typography variant="caption" sx={{ mt: 1, display: 'block', fontWeight: 600 }}>SYNCHRONIZING AI...</Typography>
+                        <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>INITIALIZING AI...</Typography>
                     </Box>
                 )}
 
-                {/* 4. Risk Factor Breakdown Overlay (Right Side) */}
-                {processedImageSrc && (
-                    <Box sx={{
-                        position: 'absolute',
-                        top: 20,
-                        right: 20,
-                        width: 200,
-                        bgcolor: 'rgba(0,0,0,0.6)',
-                        backdropFilter: 'blur(8px)',
-                        borderRadius: 2,
-                        p: 2,
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        transition: 'opacity 0.3s',
-                        opacity: currentScore > 10 ? 1 : 0.3 // Dim if low risk
-                    }}>
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 700, mb: 1, display: 'block' }}>
-                            RISK BREAKDOWN
-                        </Typography>
-                        {Object.entries(riskFactors).map(([key, val]) => (
-                            val > 0.1 && ( // Only show significant factors
-                                <Box key={key} sx={{ mb: 1.5 }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                        <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem', textTransform: 'uppercase' }}>
-                                            {key.replace('_', ' ')}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: getRiskColor(val * 100), fontWeight: 700 }}>
-                                            {Math.round(val * 100)}%
-                                        </Typography>
-                                    </Box>
-                                    <Box sx={{ width: '100%', height: 4, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                                        <Box sx={{
-                                            width: `${val * 100}%`,
-                                            height: '100%',
-                                            bgcolor: getRiskColor(val * 100),
-                                            borderRadius: 2,
-                                            transition: 'width 0.5s ease'
-                                        }} />
-                                    </Box>
-                                </Box>
-                            )
-                        ))}
-                    </Box>
-                )}
 
-                {/* HUD Overlay - PREMIUM HIGH-TECH DESIGN */}
-                <Box sx={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: 72,
-                    // Rich Gradient Background based on Risk
-                    background: `linear-gradient(to top, 
-                        ${alpha(getRiskColor(currentScore), 0.9)} 0%, 
-                        ${alpha(getRiskColor(currentScore), 0.4)} 100%)`,
-                    backdropFilter: 'blur(16px) saturate(180%)',
-                    borderTop: '1px solid rgba(255,255,255,0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    px: 4,
-                    transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: `0 -8px 32px ${alpha(getRiskColor(currentScore), 0.3)}`
-                }}>
-                    {/* Left: Stats with Glow */}
+                <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 72, background: `linear-gradient(to top, ${alpha(getRiskColor(currentScore), 0.9)} 0%, ${alpha(getRiskColor(currentScore), 0.4)} 100%)`, backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4 }}>
                     <Box sx={{ display: 'flex', gap: 4 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, opacity: 0.9 }}>
-                            <User size={18} color="#fff" strokeWidth={2.5} />
-                            <Typography variant="h6" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace', fontSize: '1.1rem' }}>
-                                {metadata?.detections?.person_count || 0}
-                            </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, opacity: 0.9 }}>
-                            <BoxIcon size={18} color="#fff" strokeWidth={2.5} />
-                            <Typography variant="h6" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace', fontSize: '1.1rem' }}>
-                                {metadata?.detections?.object_count || 0}
-                            </Typography>
-                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}><User size={18} color="#fff" /><Typography variant="h6" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace' }}>{metadata?.detections?.person_count || 0}</Typography></Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}><BoxIcon size={18} color="#fff" /><Typography variant="h6" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace' }}>{metadata?.detections?.object_count || 0}</Typography></Box>
                     </Box>
-
-                    {/* Center: CENTRAL THREAT INDICATOR */}
-                    <Box sx={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        position: 'absolute',
-                        left: '50%',
-                        transform: 'translateX(-50%)'
-                    }}>
-                        <Typography variant="overline" sx={{
-                            color: 'rgba(255,255,255,0.7)',
-                            fontWeight: 800,
-                            letterSpacing: '0.2em',
-                            lineHeight: 1,
-                            fontSize: '0.65rem'
-                        }}>
-                            STATUS
-                        </Typography>
-                        <Typography variant="h6" sx={{
-                            color: '#fff',
-                            fontWeight: 900,
-                            letterSpacing: '0.1em',
-                            lineHeight: 1,
-                            mt: 0.5,
-                            textShadow: '0 0 12px rgba(255,255,255,0.4)',
-                            fontSize: '0.9rem'
-                        }}>
-                            {(currentScore >= 75) ? 'CRITICAL BREACH' :
-                                (currentScore >= 50) ? 'ELEVATED RISK' :
-                                    (currentScore >= 25) ? 'CAUTION REQ' : 'SECURE'}
-                        </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+                        <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 800 }}>STATUS</Typography>
+                        <Typography variant="h6" sx={{ color: '#fff', fontWeight: 900 }}>{(currentScore >= 75) ? 'CRITICAL BREACH' : (currentScore >= 50) ? 'ELEVATED RISK' : (currentScore >= 25) ? 'CAUTION REQ' : 'SECURE'}</Typography>
                     </Box>
-
-                    {/* Right: Percentage - High Visibility */}
-                    <Box sx={{
-                        display: 'flex',
-                        alignItems: 'baseline',
-                        gap: 1,
-                        bgcolor: 'rgba(255,255,255,0.15)',
-                        px: 2,
-                        py: 0.5,
-                        borderRadius: 2,
-                        border: '1px solid rgba(255,255,255,0.2)'
-                    }}>
-                        <Typography variant="overline" sx={{
-                            color: 'rgba(255,255,255,0.8)',
-                            fontWeight: 900,
-                            fontSize: '0.7rem'
-                        }}>
-                            THREAT
-                        </Typography>
-                        <Typography variant="h3" sx={{
-                            color: '#fff',
-                            fontWeight: 900,
-                            fontFamily: 'monospace',
-                            lineHeight: 1,
-                            fontSize: '2rem',
-                            textShadow: '0 0 20px rgba(255,255,255,0.3)'
-                        }}>
-                            {Math.round(currentScore)}%
-                        </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, bgcolor: 'rgba(255,255,255,0.15)', px: 2, py: 0.5, borderRadius: 2 }}>
+                        <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 900 }}>THREAT</Typography>
+                        <Typography variant="h3" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace', fontSize: '2rem' }}>{Math.round(currentScore)}%</Typography>
                     </Box>
                 </Box>
             </Box>
+            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
         </Box>
     );
 };

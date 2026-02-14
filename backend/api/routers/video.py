@@ -89,7 +89,7 @@ async def process_video_file_task(video_path: str):
                 for p in det['poses']:
                     draw_skeleton(frame, np.array(p['keypoints']), np.array(p['confidence']))
                 
-                if risk > 20: # Lowered threshold for internal metrics to ensure visibility
+                if risk > 35: # Increased from 20 to reduce sensitivity
                     alt = video_engine.generate_alert(risk, facts)
                     alt['level'] = alt['level'].upper() # Standardize
                     alt['timestamp_seconds'] = frame_count / fps
@@ -139,7 +139,7 @@ async def process_video(file: UploadFile = File(...)):
         if results.get("alerts_found", 0) > 0:
             peak_alert = max(results["alerts"], key=lambda x: x['score'])
             print(f"DEBUG: Peak Score detected: {peak_alert['score']}%")
-            if peak_alert['score'] >= 30: # Use >= 30 as requested
+            if peak_alert['score'] >= 45: # Increased from 30 to reduce sensitivity
                 try:
                     db = SessionLocal()
                     factors = {

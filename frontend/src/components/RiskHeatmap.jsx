@@ -1,5 +1,5 @@
-import React from 'react';
-import { MapContainer, TileLayer, Circle, Popup, Marker } from 'react-leaflet';
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Circle, Popup, Marker, useMap } from 'react-leaflet';
 import { Box, Typography, useTheme, alpha } from '@mui/material';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -15,8 +15,38 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const ReCenter = ({ center }) => {
+    const map = useMap();
+    useEffect(() => {
+        if (center) {
+            map.setView(center, map.getZoom());
+        }
+    }, [center, map]);
+    return null;
+};
+
 const RiskHeatmap = ({ alerts }) => {
     const theme = useTheme();
+    const [mapCenter, setMapCenter] = useState([28.5355, 77.3910]); // Default Noida
+    const [systemLocation, setSystemLocation] = useState(null);
+
+    useEffect(() => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const newCenter = [latitude, longitude];
+                    setMapCenter(newCenter);
+                    setSystemLocation(newCenter);
+                    console.log("System location detected:", newCenter);
+                },
+                (error) => {
+                    console.error("Error getting system location:", error);
+                },
+                { enableHighAccuracy: true }
+            );
+        }
+    }, []);
 
     // Mock camera locations 
     const cameraLocations = [
@@ -55,16 +85,25 @@ const RiskHeatmap = ({ alerts }) => {
             }
         }}>
             <MapContainer
-                center={[28.5355, 77.3910]}
+                center={mapCenter}
                 zoom={16}
                 style={{ height: '100%', width: '100%' }}
                 zoomControl={false}
             >
+                <ReCenter center={mapCenter} />
                 {/* Clean, high-contrast light tiles */}
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 />
+
+                {systemLocation && (
+                    <Marker position={systemLocation}>
+                        <Popup>
+                            <Typography sx={{ fontWeight: 700 }}>My System Location</Typography>
+                        </Popup>
+                    </Marker>
+                )}
 
                 {cameraLocations.map((camera) => {
                     const risk = getCameraRisk(camera.id);

@@ -21,7 +21,7 @@ def test_weapon_escalation():
     print(f"Knife Risk Score: {score_knife:.2f}%")
     print(f"Knife Factors: {factors_knife}")
     
-    if score_knife < 80:
+    if score_knife < 65: # Updated from 80
         print("FAILED: Knife risk score too low!")
     else:
         print("PASSED: Knife triggered critical risk.")
@@ -40,7 +40,7 @@ def test_weapon_escalation():
     print(f"Gun Risk Score: {score_gun:.2f}%")
     print(f"Gun Factors: {factors_gun}")
     
-    if score_gun < 80:
+    if score_gun < 65: # Updated from 80
         print("FAILED: Gun risk score too low!")
     else:
         print("PASSED: Gun triggered critical risk.")

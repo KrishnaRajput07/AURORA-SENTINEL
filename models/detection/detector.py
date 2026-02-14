@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 import torch
+from concurrent.futures import ThreadPoolExecutor
+import time
 
 class UnifiedDetector:
     """
@@ -12,6 +14,10 @@ class UnifiedDetector:
             self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         else:
             self.device = device
+        
+        if self.device == 'cuda':
+            torch.backends.cudnn.benchmark = True
+            
         print(f"Initializing UnifiedDetector on {self.device}...")
         
         # Load models
@@ -53,6 +59,10 @@ class UnifiedDetector:
         # Initialize Simple Tracker (Fallback since YOLO track crashes on Windows)
         self.tracker = SimpleTracker()
         
+        # Parallel Execution Pool
+        self.executor = ThreadPoolExecutor(max_workers=3)
+        self.use_half = self.device == 'cuda'
+        
     def detect_objects(self, frame):
         """
         Detect and TRACK objects in frame using SimpleTracker
@@ -63,7 +73,8 @@ class UnifiedDetector:
             frame, 
             verbose=False, 
             device=self.device,
-            classes=list(self.critical_objects.keys())
+            classes=list(self.critical_objects.keys()),
+            half=self.use_half
         )[0]
         
         raw_boxes = []
@@ -94,7 +105,7 @@ class UnifiedDetector:
         # Run pose estimation
         # Note: We could run this on crops from detect_objects for speed, 
         # but running full frame is often more robust for context.
-        results = self.pose_model(frame, verbose=False, device=self.device)[0]
+        results = self.pose_model(frame, verbose=False, device=self.device, half=self.use_half)[0]
         
         poses = []
         if results.keypoints is not None:
@@ -134,7 +145,8 @@ class UnifiedDetector:
             frame, 
             verbose=False, 
             device=self.device,
-            conf=0.3
+            conf=0.3,
+            half=self.use_half
         )[0]
         
         weapons = []
@@ -154,16 +166,16 @@ class UnifiedDetector:
 
     def process_frame(self, frame):
         """
-        Complete detection pipeline
+        Complete detection pipeline - Parallelized for performance
         """
-        # 1. Run Object Tracking
-        objects = self.detect_objects(frame)
+        # 1. Run inference in parallel
+        future_objs = self.executor.submit(self.detect_objects, frame)
+        future_poses = self.executor.submit(self.detect_poses, frame)
+        future_weapons = self.executor.submit(self.detect_weapons, frame)
         
-        # 2. Run Pose Estimation
-        poses = self.detect_poses(frame)
-        
-        # 3. Run Weapon Detection (NEW)
-        weapons = self.detect_weapons(frame)
+        objects = future_objs.result()
+        poses = future_poses.result()
+        weapons = future_weapons.result()
         
         # 4. Match Poses to Tracked Objects (Critical for Risk Engine)
         self._assign_tracks_to_poses(objects, poses)
@@ -172,8 +184,16 @@ class UnifiedDetector:
             'objects': objects,
             'poses': poses,
             'weapons': weapons,
-            'timestamp': cv2.getTickCount() / cv2.getTickFrequency()
+            'timestamp': time.time()
         }
+
+    def warmup(self):
+        """Run dummy frames through models to initialize CUDA/weights"""
+        print("Warming up models...")
+        dummy = np.zeros((640, 640, 3), dtype=np.uint8)
+        for _ in range(3):
+            self.process_frame(dummy)
+        print("Model warmup complete.")
         
     def _assign_tracks_to_poses(self, objects, poses):
         """

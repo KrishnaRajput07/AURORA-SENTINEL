@@ -31,19 +31,19 @@ class RiskScoringEngine:
         
         # Balanced weights (Sum = 1.0) as per Innovation Spec
         self.weights = {
-            'weapon_detection': 0.45,   # High priority
+            'weapon_detection': 0.35,   # Reduced from 0.45
             'aggressive_posture': 0.15,
             'proximity_violation': 0.10,
             'unattended_object': 0.15,
-            'loitering': 0.05,
-            'crowd_density': 0.05,
+            'loitering': 0.10,         # Increased slightly to compensate
+            'crowd_density': 0.10,      # Increased slightly to compensate
             'contextual': 0.05
         }
         
         # Time-Based Thresholds (Seconds)
         self.thresholds = {
-            'loitering_time': 5.0,      # 5 seconds
-            'unattended_time': 10.0,    # 10 seconds
+            'loitering_time': 15.0,     # Increased from 5.0
+            'unattended_time': 30.0,    # Increased from 10.0
             'crowd_multiplier': 2.0     # Alert if 2x more than baseline
         }
         
@@ -102,7 +102,7 @@ class RiskScoringEngine:
             if factors.get('aggressive_posture', 0) > 0.75:
                 suppression_factor = 1.0
             elif high_risk_count < 2 and factors['unattended_object'] < 0.5:
-                suppression_factor = 0.7  
+                suppression_factor = 0.5  # Increased suppression (was 0.7)
             else:
                 suppression_factor = 1.0
             
@@ -112,11 +112,11 @@ class RiskScoringEngine:
         # WEAPON ESCALATION (NEW): 
         # If a weapon is detected, we want to skip standard weighing and 
         # immediately escalate to a critical level.
-        if factors.get('weapon_detection', 0) > 0.3:
-            # Ensure at least 80% risk if a weapon is even slightly visible
+        if factors.get('weapon_detection', 0) > 0.5: # Increased threshold (was 0.3)
+            # Ensure at least 65% risk if a weapon is even slightly visible
             # Scales to 100% with weapon confidence
             print(f"DEBUG: Weapon Detected! Confidence: {factors['weapon_detection']:.2f}, Escalating Score...")
-            raw_score = max(raw_score, 0.8 + (factors['weapon_detection'] * 0.2))
+            raw_score = max(raw_score, 0.65 + (factors['weapon_detection'] * 0.35))
             suppression_factor = 1.0 # Never suppress a weapon threat
         
         # Apply suppression
@@ -124,7 +124,7 @@ class RiskScoringEngine:
         
         # 4. Temporal Smoothing (avoid flickering)
         # CRITICAL FIX: If weapon detected, bypass smoothing for INSTANT alert
-        if factors.get('weapon_detection', 0) > 0.3:
+        if factors.get('weapon_detection', 0) > 0.5: # Consistent with escalation threshold
              # Fill history with current score to maintain high alert state
              for _ in range(self.risk_history.maxlen):
                  self.risk_history.append(final_risk_score)
