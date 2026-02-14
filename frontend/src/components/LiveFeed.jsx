@@ -3,6 +3,7 @@ import { Box, Typography, useTheme, alpha, MenuItem, Select, FormControl } from 
 import { User, Box as BoxIcon, RefreshCw } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { useSettings } from '../context/SettingsContext';
+import { WS_BASE_URL } from '../config';
 
 const LiveFeed = () => {
     const { addNotification } = useNotifications();
@@ -85,7 +86,7 @@ const LiveFeed = () => {
     // WebSocket & Loop
     useEffect(() => {
         const connect = () => {
-            const ws = new WebSocket(`ws://localhost:8000/ws/live-feed`);
+            const ws = new WebSocket(`${WS_BASE_URL}/ws/live-feed`);
             wsRef.current = ws;
 
             ws.onopen = () => setIsConnected(true);

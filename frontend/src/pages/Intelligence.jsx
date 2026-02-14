@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { Box, Typography, Paper, Grid, Button, IconButton, LinearProgress, Drawer, List, ListItem, alpha, useTheme, Chip, Divider, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { Upload, FileVideo, X, Play, Shield, Search, ChevronRight, AlertTriangle, CheckCircle2, Clock, Activity, Users, Target, Rewind, Maximize2, FileText } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
@@ -15,6 +16,10 @@ const Intelligence = () => {
         drawerOpen, setDrawerOpen,
         notification, setNotification
     } = useIntelligence();
+
+    const [locationType, setLocationType] = React.useState('public');
+    const [sensitivity, setSensitivity] = React.useState(1.0);
+    const [analysisHour, setAnalysisHour] = React.useState(new Date().getHours());
 
     // const [activeTab, setActiveTab] = useState('summary'); // Not used in render?
     const videoRef = useRef(null);
@@ -38,13 +43,22 @@ const Intelligence = () => {
 
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('location_type', locationType);
+        formData.append('sensitivity', sensitivity);
+        formData.append('hour', analysisHour);
 
         try {
             const timer = setInterval(() => {
                 setProgress(prev => (prev < 90 ? prev + 3 : prev));
             }, 1000);
 
-            const response = await fetch('http://localhost:8000/process/video', {
+            const queryString = new URLSearchParams({
+                location_type: locationType,
+                sensitivity: sensitivity,
+                hour: analysisHour
+            }).toString();
+
+            const response = await fetch(`${API_BASE_URL}/process/video?${queryString}`, {
                 method: 'POST',
                 body: formData
             });
@@ -93,8 +107,8 @@ const Intelligence = () => {
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 100, 100);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 38);
-        doc.text(`Video: ${file?.name || 'Unknown'}`, 20, 44);
+        doc.text(`Generated: ${new Date().toLocaleString()} `, 20, 38);
+        doc.text(`Video: ${file?.name || 'Unknown'} `, 20, 44);
 
         // Summary Section
         doc.setFontSize(14);
@@ -104,9 +118,9 @@ const Intelligence = () => {
 
         doc.setFontSize(11);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Fight Probability: ${analysisResult.metrics?.fight_probability ?? 0}%`, 20, 66);
-        doc.text(`Maximum Persons Detected: ${analysisResult.metrics?.max_persons ?? 0}`, 20, 73);
-        doc.text(`Total Alerts Generated: ${analysisResult.alerts?.length ?? 0}`, 20, 80);
+        doc.text(`Fight Probability: ${analysisResult.metrics?.fight_probability ?? 0}% `, 20, 66);
+        doc.text(`Maximum Persons Detected: ${analysisResult.metrics?.max_persons ?? 0} `, 20, 73);
+        doc.text(`Total Alerts Generated: ${analysisResult.alerts?.length ?? 0} `, 20, 80);
 
         // Suspicious Patterns
         doc.setFontSize(14);
@@ -117,7 +131,7 @@ const Intelligence = () => {
         doc.setFont('helvetica', 'normal');
         if (analysisResult.metrics?.suspicious_patterns?.length > 0) {
             analysisResult.metrics.suspicious_patterns.forEach((pattern, i) => {
-                doc.text(`• ${pattern}`, 25, 100 + (i * 6));
+                doc.text(`• ${pattern} `, 25, 100 + (i * 6));
             });
         } else {
             doc.text('• No aggressive motion vectors detected', 25, 100);
@@ -130,9 +144,9 @@ const Intelligence = () => {
         doc.text('Detailed Alert Timeline', 20, tableStartY);
 
         const tableData = (analysisResult.alerts || []).map(alert => [
-            `${Math.floor((alert.timestamp_seconds || 0) / 60)}:${((alert.timestamp_seconds || 0) % 60).toFixed(0).padStart(2, '0')}`,
+            `${Math.floor((alert.timestamp_seconds || 0) / 60)}:${((alert.timestamp_seconds || 0) % 60).toFixed(0).padStart(2, '0')} `,
             (alert.level || 'INFO').toUpperCase(),
-            `${alert.score || 0}%`,
+            `${alert.score || 0}% `,
             (alert.top_factors || []).join(', ')
         ]);
 
@@ -158,7 +172,7 @@ const Intelligence = () => {
             doc.setFontSize(8);
             doc.setTextColor(150, 150, 150);
             doc.text(
-                `AURORA-SENTINEL v2.0 PRO | Page ${i} of ${pageCount} | Confidential`,
+                `AURORA - SENTINEL v2.0 PRO | Page ${i} of ${pageCount} | Confidential`,
                 doc.internal.pageSize.getWidth() / 2,
                 doc.internal.pageSize.getHeight() - 10,
                 { align: 'center' }
@@ -167,7 +181,7 @@ const Intelligence = () => {
 
         // Save
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-        doc.save(`AURORA-Forensic-Report-${timestamp}.pdf`);
+        doc.save(`AURORA - Forensic - Report - ${timestamp}.pdf`);
     };
 
     return (
@@ -191,8 +205,64 @@ const Intelligence = () => {
 
             <Grid container spacing={4}>
                 {/* LEFT COLUMN: Upload & Analysis Results */}
-                <Grid item xs={12} lg={analysisResult ? 12 : 8}>
+                <Grid item xs={12} lg={8}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {/* Context Settings Section */}
+                        {!analysisResult && (
+                            <Paper sx={{ p: 4, borderRadius: 5, border: `1px solid ${alpha(theme.palette.divider, 0.1)} ` }}>
+                                <Typography variant="h6" sx={{ fontWeight: 800, mb: 3, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <Shield size={20} color={theme.palette.primary.main} /> Contextual Intelligence Settings
+                                </Typography>
+                                <Grid container spacing={3}>
+                                    <Grid item xs={12} md={4}>
+                                        <Typography variant="caption" sx={{ fontWeight: 900, mb: 1, display: 'block', opacity: 0.6 }}>LOCATION TYPE</Typography>
+                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                            {['public', 'secure_facility', 'private_property'].map((loc) => (
+                                                <Chip
+                                                    key={loc}
+                                                    label={loc.replace('_', ' ').toUpperCase()}
+                                                    onClick={() => setLocationType(loc)}
+                                                    color={locationType === loc ? "primary" : "default"}
+                                                    variant={locationType === loc ? "filled" : "outlined"}
+                                                    sx={{ fontWeight: 700, borderRadius: 2 }}
+                                                />
+                                            ))}
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={12} md={4}>
+                                        <Typography variant="caption" sx={{ fontWeight: 900, mb: 1, display: 'block', opacity: 0.6 }}>BASE SENSITIVITY ({sensitivity}x)</Typography>
+                                        <Box sx={{ px: 2 }}>
+                                            <input
+                                                type="range"
+                                                min="0.5"
+                                                max="2.0"
+                                                step="0.1"
+                                                value={sensitivity}
+                                                onChange={(e) => setSensitivity(parseFloat(e.target.value))}
+                                                style={{ width: '100%', accentColor: theme.palette.primary.main }}
+                                            />
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={12} md={4}>
+                                        <Typography variant="caption" sx={{ fontWeight: 900, mb: 1, display: 'block', opacity: 0.6 }}>RECORDING HOUR (0-23)</Typography>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="23"
+                                            value={analysisHour}
+                                            onChange={(e) => setAnalysisHour(parseInt(e.target.value))}
+                                            style={{
+                                                width: '100%',
+                                                padding: '8px',
+                                                borderRadius: '8px',
+                                                border: `1px solid ${alpha(theme.palette.divider, 0.2)} `,
+                                                fontWeight: 800
+                                            }}
+                                        />
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        )}
                         {/* Upload Section */}
                         <Paper
                             {...getRootProps()}
@@ -200,7 +270,7 @@ const Intelligence = () => {
                                 p: 6,
                                 textAlign: 'center',
                                 cursor: uploading ? 'not-allowed' : 'pointer',
-                                border: `2px dashed ${isDragActive ? theme.palette.primary.main : alpha(theme.palette.divider, 0.5)}`,
+                                border: `2px dashed ${isDragActive ? theme.palette.primary.main : alpha(theme.palette.divider, 0.5)} `,
                                 borderRadius: 6,
                                 bgcolor: isDragActive ? alpha(theme.palette.primary.main, 0.05) : '#fff',
                                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -255,7 +325,7 @@ const Intelligence = () => {
                                 <Grid container spacing={3}>
                                     {/* Score Card */}
                                     <Grid item xs={12} md={4}>
-                                        <Paper sx={{ p: 3, borderRadius: 5, bgcolor: alpha(theme.palette.error.main, 0.03), border: `1px solid ${alpha(theme.palette.error.main, 0.1)}` }}>
+                                        <Paper sx={{ p: 3, borderRadius: 5, bgcolor: alpha(theme.palette.error.main, 0.03), border: `1px solid ${alpha(theme.palette.error.main, 0.1)} ` }}>
                                             <Typography variant="caption" sx={{ fontWeight: 900, opacity: 0.6, letterSpacing: '0.1em' }}>FIGHT PROBABILITY</Typography>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
                                                 <Typography variant="h2" sx={{ fontWeight: 900, color: theme.palette.error.main }}>
@@ -270,14 +340,14 @@ const Intelligence = () => {
                                     <Grid item xs={12} md={8}>
                                         <Grid container spacing={2}>
                                             <Grid item xs={6} sm={4}>
-                                                <Paper sx={{ p: 2, borderRadius: 4, textAlign: 'center', border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                                                <Paper sx={{ p: 2, borderRadius: 4, textAlign: 'center', border: `1px solid ${alpha(theme.palette.divider, 0.1)} ` }}>
                                                     <Users size={20} style={{ marginBottom: 8, color: theme.palette.primary.main }} />
                                                     <Typography variant="h5" sx={{ fontWeight: 900 }}>{analysisResult.metrics?.max_persons ?? 0}</Typography>
                                                     <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.5 }}>PEAK CAPACITY</Typography>
                                                 </Paper>
                                             </Grid>
                                             <Grid item xs={6} sm={4}>
-                                                <Paper sx={{ p: 2, borderRadius: 4, textAlign: 'center', border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                                                <Paper sx={{ p: 2, borderRadius: 4, textAlign: 'center', border: `1px solid ${alpha(theme.palette.divider, 0.1)} ` }}>
                                                     <Activity size={20} style={{ marginBottom: 8, color: theme.palette.primary.main }} />
                                                     <Typography variant="h5" sx={{ fontWeight: 900 }}>POSE</Typography>
                                                     <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.5 }}>ACTIVE SCAN</Typography>
@@ -290,7 +360,7 @@ const Intelligence = () => {
                                                     textAlign: 'center',
                                                     bgcolor: (analysisResult.metrics?.fight_probability > 30 || analysisResult.archived_to_bin) ? theme.palette.error.main : theme.palette.success.main,
                                                     color: '#fff',
-                                                    boxShadow: (analysisResult.metrics?.fight_probability > 30 || analysisResult.archived_to_bin) ? `0 10px 20px ${alpha(theme.palette.error.main, 0.3)}` : 'none'
+                                                    boxShadow: (analysisResult.metrics?.fight_probability > 30 || analysisResult.archived_to_bin) ? `0 10px 20px ${alpha(theme.palette.error.main, 0.3)} ` : 'none'
                                                 }}>
                                                     {(analysisResult.metrics?.fight_probability > 30 || analysisResult.archived_to_bin) ? <Shield size={20} style={{ marginBottom: 8 }} /> : <CheckCircle2 size={20} style={{ marginBottom: 8 }} />}
                                                     <Typography variant="h5" sx={{ fontWeight: 900 }}>{(analysisResult.metrics?.fight_probability > 30 || analysisResult.archived_to_bin) ? 'ARCHIVED' : 'SECURE'}</Typography>
@@ -319,7 +389,7 @@ const Intelligence = () => {
                                     {/* Event Markers List */}
                                     {/* Detailed Event Markers (Timestamps) Restored */}
                                     <Grid item xs={12}>
-                                        <Paper sx={{ p: 3, borderRadius: 5, border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                                        <Paper sx={{ p: 3, borderRadius: 5, border: `1px solid ${alpha(theme.palette.divider, 0.1)} ` }}>
                                             <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                                                 <Clock size={18} color={theme.palette.primary.main} /> Forensic Event Markers
                                             </Typography>
@@ -330,7 +400,7 @@ const Intelligence = () => {
                                                             px: 3, py: 1.5, mb: 1.5,
                                                             borderRadius: 4,
                                                             bgcolor: alpha(theme.palette.divider, 0.02),
-                                                            border: `1px solid ${alpha(theme.palette.divider, 0.05)}`,
+                                                            border: `1px solid ${alpha(theme.palette.divider, 0.05)} `,
                                                             '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) }
                                                         }}>
                                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
@@ -391,20 +461,22 @@ const Intelligence = () => {
                                     // Fallback to original file or show error
                                 }}
                             />
-                            {!analysisResult?.processed_url && (
-                                <Box sx={{ textAlign: 'center', p: 4 }}>
-                                    <CircularProgress color="primary" />
-                                    <Typography sx={{ mt: 2, color: 'rgba(255,255,255,0.5)' }}>Loading Forensic Stream...</Typography>
-                                </Box>
-                            )}
+                            {
+                                !analysisResult?.processed_url && (
+                                    <Box sx={{ textAlign: 'center', p: 4 }}>
+                                        <CircularProgress color="primary" />
+                                        <Typography sx={{ mt: 2, color: 'rgba(255,255,255,0.5)' }}>Loading Forensic Stream...</Typography>
+                                    </Box>
+                                )
+                            }
                             <Box sx={{ position: 'absolute', top: 20, left: 20, pointerEvents: 'none', display: 'flex', gap: 1 }}>
                                 <Chip label="AI RENDERING" size="small" color="error" sx={{ fontWeight: 900, borderRadius: 1 }} />
                                 <Chip label="H.264" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: '#fff', fontWeight: 900, borderRadius: 1 }} />
                             </Box>
-                        </Box>
+                        </Box >
 
                         {/* Player Controls (Custom labels for better UX) */}
-                        <Box sx={{ p: 3, bgcolor: '#111', borderRadius: 4, border: '1px solid #333' }}>
+                        < Box sx={{ p: 3, bgcolor: '#111', borderRadius: 4, border: '1px solid #333' }}>
                             <Grid container spacing={2}>
                                 <Grid item xs={12}>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
@@ -419,7 +491,7 @@ const Intelligence = () => {
                                     <IconButton sx={{ ml: 'auto', color: '#fff' }}><Maximize2 size={18} /></IconButton>
                                 </Grid>
                             </Grid>
-                        </Box>
+                        </Box >
 
                         <Divider sx={{ borderColor: '#333' }} />
 
@@ -441,10 +513,10 @@ const Intelligence = () => {
                                 ))}
                             </List>
                         </Box>
-                    </Box>
+                    </Box >
 
                     {/* Footer Action */}
-                    <Box sx={{ p: 3, borderTop: '1px solid #333', bgcolor: '#111' }}>
+                    < Box sx={{ p: 3, borderTop: '1px solid #333', bgcolor: '#111' }}>
                         <Button
                             fullWidth
                             variant="contained"
@@ -455,9 +527,9 @@ const Intelligence = () => {
                         >
                             Generate Forensic PDF Report
                         </Button>
-                    </Box>
-                </Box>
-            </Drawer>
+                    </Box >
+                </Box >
+            </Drawer >
 
             <style>
                 {`
@@ -478,7 +550,7 @@ const Intelligence = () => {
                     {notification.message}
                 </Alert>
             </Snackbar>
-        </Box>
+        </Box >
     );
 };
 

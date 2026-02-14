@@ -4,6 +4,7 @@ import { Shield, Users, Bell, Settings, FileText, CheckCircle, XCircle, UserPlus
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import logoImage from '../assets/logo.png';
+import { API_BASE_URL } from '../config';
 
 const AdminDashboard = () => {
     const theme = useTheme();
@@ -84,7 +85,7 @@ const AdminDashboard = () => {
     const fetchAuditHistory = async () => {
         setLoadingLogs(true);
         try {
-            const response = await fetch('http://localhost:8000/alerts/history?limit=50');
+            const response = await fetch(`${API_BASE_URL}/alerts/history?limit=50`);
             const data = await response.json();
             setAuditHistory(data.alerts);
         } catch (error) {

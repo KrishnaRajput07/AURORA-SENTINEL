@@ -56,7 +56,7 @@ class RiskScoringEngine:
         # 0. Calibration Phase
         import time
         # Prefer context timestamp (from video), fallback to detection timestamp, then system time
-        current_time = context.get('timestamp') if context else detection_data.get('timestamp', time.time())
+        current_time = context.get('timestamp') if (context and context.get('timestamp') is not None) else detection_data.get('timestamp', time.time())
         self._current_timestamp = current_time # Internal state for helpers
         if self.start_time is None: self.start_time = current_time
         
@@ -91,7 +91,12 @@ class RiskScoringEngine:
         else:
             factors['contextual'] = 0.0
             
-        # 2. Multi-Signal Validation
+        # 2. Sensitivity Adjustment (NEW)
+        # Apply user-defined sensitivity if provided in context
+        sensitivity = context.get('sensitivity', 1.0) if context else 1.0
+        # Sensitivity 0.5 = 50% risk, Sensitivity 2.0 = 200% risk (capped)
+        
+        # 3. Multi-Signal Validation
         # If a weapon is detected, we always want high risk, regardless of other factors
         if factors['weapon_detection'] > 0.5:
             suppression_factor = 1.0
@@ -106,8 +111,11 @@ class RiskScoringEngine:
             else:
                 suppression_factor = 1.0
             
-        # 3. Calculate Weighted Sum
+        # 4. Calculate Weighted Sum
         raw_score = sum(factors[k] * self.weights.get(k, 0) for k in factors)
+        
+        # Apply Sensitivity
+        raw_score *= sensitivity
         
         # WEAPON ESCALATION (NEW): 
         # If a weapon is detected, we want to skip standard weighing and 
@@ -122,7 +130,7 @@ class RiskScoringEngine:
         # Apply suppression
         final_risk_score = raw_score * suppression_factor
         
-        # 4. Temporal Smoothing (avoid flickering)
+        # 5. Temporal Smoothing (avoid flickering)
         # CRITICAL FIX: If weapon detected, bypass smoothing for INSTANT alert
         if factors.get('weapon_detection', 0) > 0.5: # Consistent with escalation threshold
              # Fill history with current score to maintain high alert state
@@ -390,8 +398,19 @@ class RiskScoringEngine:
 
     def _apply_context(self, context):
         score = 0.0
-        if context.get('hour', 12) > 22 or context.get('hour', 12) < 5:
+        
+        # 1. Time-based context
+        hour = context.get('hour', 12)
+        if hour > 22 or hour < 5:
             score += 0.4
+            
+        # 2. Location-based context (NEW)
+        location_type = context.get('location_type', 'public')
+        if location_type == 'secure_facility':
+            score += 0.5
+        elif location_type == 'private_property':
+            score += 0.3
+            
         return min(1.0, score)
 
     def _is_person_moving(self, pose):

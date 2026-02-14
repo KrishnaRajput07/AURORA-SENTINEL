@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Shield, AlertTriangle, MoreHorizontal } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { API_BASE_URL } from '../config';
 
 const Dashboard = () => {
     const { user } = useAuth();
@@ -37,7 +38,7 @@ const Dashboard = () => {
 
     const fetchAlerts = async () => {
         try {
-            const response = await fetch('http://localhost:8000/alerts/recent');
+            const response = await fetch(`${API_BASE_URL}/alerts/recent`);
             const data = await response.json();
             setAlerts(data.alerts);
         } catch (error) { console.error('Error fetching alerts:', error); }
@@ -45,7 +46,7 @@ const Dashboard = () => {
 
     const fetchRiskData = async () => {
         try {
-            const response = await fetch('http://localhost:8000/analytics/dashboard');
+            const response = await fetch(`${API_BASE_URL}/analytics/dashboard`);
             const data = await response.json();
             setRiskData(data);
         } catch (error) { console.error('Error fetching risk data:', error); }

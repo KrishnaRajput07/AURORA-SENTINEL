@@ -46,9 +46,26 @@ async def startup_event():
 # Include Routers
 app.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
 app.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
-app.include_router(stream.router, prefix="/ws", tags=["Live Stream"]) # Mounts at /ws/live-feed
-app.include_router(video.router, tags=["Video Processing"]) # Mounts at /process/video (explicit in router)
+app.include_router(stream.router, prefix="/ws", tags=["Live Stream"])
+app.include_router(video.router, tags=["Video Processing"])
 app.include_router(archive.router, prefix="/archive", tags=["Archive"])
+
+# Serve Static Files (Frontend)
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+# Check if build directory exists
+if os.path.exists("frontend/build"):
+    app.mount("/", StaticFiles(directory="frontend/build", html=True), name="frontend")
+    
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Prevent intercepting API routes
+        if full_path.startswith(("alerts", "analytics", "ws", "process", "archive", "health")):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        return FileResponse("frontend/build/index.html")
+else:
+    print("WARNING: frontend/build directory not found. Frontend will not be served by backend.")
 
 
 @app.get("/")

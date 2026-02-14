@@ -5,6 +5,7 @@ import { Server, Database, Shield, Cpu, Activity, Users, FileText, HardDrive, Re
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import { API_BASE_URL } from '../config';
 
 const SystemPage = () => {
     const [tabIndex, setTabIndex] = useState(0);
@@ -23,7 +24,7 @@ const SystemPage = () => {
     }, [location.state]);
 
     useEffect(() => {
-        fetch('http://localhost:8000/health')
+        fetch(`${API_BASE_URL}/health`)
             .then(res => res.json())
             .then(data => setHealth(data))
             .catch(err => console.error(err));

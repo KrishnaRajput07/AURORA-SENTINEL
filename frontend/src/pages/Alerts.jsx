@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Paper } from '@mui/material';
 import AlertQueue from '../components/AlertQueue';
+import { API_BASE_URL } from '../config';
 
 const AlertsPage = () => {
     const [alerts, setAlerts] = useState([]);
@@ -13,7 +14,7 @@ const AlertsPage = () => {
 
     const fetchAlerts = async () => {
         try {
-            const response = await fetch('http://localhost:8000/alerts/recent?limit=100');
+            const response = await fetch(`${API_BASE_URL}/alerts/recent?limit=100`);
             const data = await response.json();
             setAlerts(data.alerts);
         } catch (error) {

@@ -3,6 +3,7 @@ import { Box, Typography, Paper, Divider } from '@mui/material';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import AlertQueue from '../components/AlertQueue';
 import { BarChart2 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 const AnalyticsPage = () => {
     const [riskData, setRiskData] = useState(null);
@@ -17,8 +18,8 @@ const AnalyticsPage = () => {
     const fetchData = async () => {
         try {
             const [riskRes, alertsRes] = await Promise.all([
-                fetch('http://localhost:8000/analytics/dashboard'),
-                fetch('http://localhost:8000/alerts/recent')
+                fetch(`${API_BASE_URL}/analytics/dashboard`),
+                fetch(`${API_BASE_URL}/alerts/recent`)
             ]);
 
             const rData = await riskRes.json();
