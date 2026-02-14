@@ -87,18 +87,36 @@ class OfflineProcessor:
                 
                 # Try to parse the result as JSON. If fails, perform fallback.
                 
+                # Robust JSON Extraction
                 raw_text = result.get('description', '{}')
                 parsed_data = {}
                 
-                try:
-                    # Find JSON substring
-                    json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-                    if json_match:
-                        parsed_data = json.loads(json_match.group(0))
-                    else:
-                        raise ValueError("No JSON found")
-                except Exception:
-                    # Fallback for plain text
+                def extract_json(text):
+                    try:
+                        # 1. Strip Markdown Code Blocks
+                        text = re.sub(r'```json\s*', '', text, flags=re.IGNORECASE)
+                        text = re.sub(r'```\s*', '', text)
+                        
+                        # 2. Find outermost braces
+                        match = re.search(r'\{.*\}', text, re.DOTALL)
+                        if match:
+                            candidate = match.group(0)
+                            
+                            # 3. Fix simple trailing commas (common LLM error)
+                            candidate = re.sub(r',\s*}', '}', candidate)
+                            candidate = re.sub(r',\s*]', ']', candidate)
+                            
+                            return json.loads(candidate)
+                    except:
+                        pass
+                    return None
+
+                json_obj = extract_json(raw_text)
+                
+                if json_obj:
+                    parsed_data = json_obj
+                else:
+                    # Fallback for plain text or failed parse
                     parsed_data = {
                         "summary": raw_text,
                         "threats": [],
