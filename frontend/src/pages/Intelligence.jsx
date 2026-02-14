@@ -5,6 +5,7 @@ import { useDropzone } from 'react-dropzone';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useIntelligence } from '../context/IntelligenceContext';
+import IntelligencePanel from '../components/IntelligencePanel'; // NEW
 
 const Intelligence = () => {
     const {
@@ -16,6 +17,7 @@ const Intelligence = () => {
         notification, setNotification
     } = useIntelligence();
 
+    const [searchOpen, setSearchOpen] = React.useState(false); // NEW STATE
     // const [activeTab, setActiveTab] = useState('summary'); // Not used in render?
     const videoRef = useRef(null);
     const theme = useTheme();
@@ -182,11 +184,16 @@ const Intelligence = () => {
                         Forensic AI pipeline with pose estimation and behavioral tracking.
                     </Typography>
                 </Box>
-                {analysisResult && (
-                    <Button variant="outlined" onClick={() => setDrawerOpen(true)} startIcon={<Activity size={18} />} sx={{ borderRadius: 2, fontWeight: 700 }}>
-                        Open Forensic Player
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button variant="contained" color="secondary" onClick={() => setSearchOpen(true)} startIcon={<Search size={18} />} sx={{ borderRadius: 2, fontWeight: 700 }}>
+                        Archive Search
                     </Button>
-                )}
+                    {analysisResult && (
+                        <Button variant="outlined" onClick={() => setDrawerOpen(true)} startIcon={<Activity size={18} />} sx={{ borderRadius: 2, fontWeight: 700 }}>
+                            Open Forensic Player
+                        </Button>
+                    )}
+                </Box>
             </Box>
 
             <Grid container spacing={4}>
@@ -457,6 +464,15 @@ const Intelligence = () => {
                         </Button>
                     </Box>
                 </Box>
+            </Drawer>
+
+            {/* NEW DRAWER: SEARCH PANEL */}
+            <Drawer
+                anchor="right"
+                open={searchOpen}
+                onClose={() => setSearchOpen(false)}
+            >
+                <IntelligencePanel />
             </Drawer>
 
             <style>

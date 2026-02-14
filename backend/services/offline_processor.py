@@ -74,25 +74,53 @@ class OfflineProcessor:
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 pil_img = Image.fromarray(rgb_frame)
                 
-                # Prompt - CRITICAL SURVEILLANCE MENTALITY
+                # Prompt - STRICT JSON & THREAT DETECTION
                 prompt = (
-                    "You are a critical surveillance AI. Analyze this scene for security threats. "
-                    "Describe any fighting, weapons, aggression, or suspicious behavior immediately. "
-                    "Do not use soft language. If people are fighting, say 'Physical Altercation'. "
-                    "If safe, be concise. Focus on: Weapons, Violence, Crowds, Distress."
+                    "Analyze this surveillance frame. Return a valid JSON object only. "
+                    "Format: {\"summary\": \"concise description\", \"threats\": [\"list\", \"of\", \"weapons\", \"or\", \"violence\"], \"severity\": \"low/medium/high\", \"confidence\": 0-100}. "
+                    "Focus strictly on: Guns, Knives, Fighting, Blood, Fire. "
+                    "If safe, severity is 'low'. Do not hallucinate."
                 )
-                
-                # Call VLM (Blocking is fine here, it's offline!)
+
+                # Call VLM
                 result = vlm_service.analyze_scene(pil_img, prompt)
-                description = result.get('description', 'Analysis failed')
                 
-                print(f"    -> AI: {description[:60]}...")
+                # Try to parse the result as JSON. If fails, perform fallback.
                 
-                events.append({
+                raw_text = result.get('description', '{}')
+                parsed_data = {}
+                
+                try:
+                    # Find JSON substring
+                    json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+                    if json_match:
+                        parsed_data = json.loads(json_match.group(0))
+                    else:
+                        raise ValueError("No JSON found")
+                except Exception:
+                    # Fallback for plain text
+                    parsed_data = {
+                        "summary": raw_text,
+                        "threats": [],
+                        "severity": "unknown",
+                        "confidence": 0
+                    }
+
+                # Save structured data
+                event = {
                     "timestamp": round(timestamp, 2),
-                    "description": description,
-                    "provider": result.get('provider')
-                })
+                    "description": parsed_data.get('summary', raw_text),
+                    "threats": parsed_data.get('threats', []),
+                    "severity": parsed_data.get('severity', 'low'),
+                    "confidence": parsed_data.get('confidence', 0),
+                    "provider": vlm_service.provider_name
+                }
+                
+                # Store text for semantic search (combine fields)
+                # We store the rich text description for searching, but keep structured data for UI
+                events.append(event)
+                
+                print(f"  [Time: {round(timestamp, 2)}s] {parsed_data.get('summary', 'Processed')[:50]}... | Severity: {parsed_data.get('severity')}")
             
             current_frame += 1
             

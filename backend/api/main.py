@@ -4,7 +4,7 @@ load_dotenv() # MUST BE FIRST
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db.database import engine, Base
-from backend.api.routers import alerts, analytics, video, stream, archive, stream_vlm
+from backend.api.routers import alerts, analytics, video, stream, archive, stream_vlm, intelligence
 from backend.services.ml_service import ml_service
 import os
 
@@ -14,6 +14,8 @@ Base.metadata.create_all(bind=engine)
 # Initialize FastAPI
 app = FastAPI(title="AURORA-SENTINEL API", version="2.0.0")
 
+from fastapi.staticfiles import StaticFiles
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -22,6 +24,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve recorded videos
+app.mount("/recordings", StaticFiles(directory="storage/recordings"), name="recordings")
 
 from fastapi.responses import JSONResponse
 from fastapi import Request

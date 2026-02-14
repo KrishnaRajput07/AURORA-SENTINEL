@@ -81,3 +81,15 @@ class SearchService:
 
 # Singleton
 search_service = SearchService()
+
+if __name__ == "__main__":
+    # Add project root to path for standalone execution
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    
+    print("Indexing metadata...")
+    search_service.index_metadata()
+    print("Test Search: 'fight'")
+    res = search_service.search("fight")
+    for r in res:
+        print(f"  [{r['score']:.2f}] {r['description'][:50]}...")
