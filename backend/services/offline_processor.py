@@ -126,12 +126,28 @@ class OfflineProcessor:
             
         cap.release()
         
+        # ---------------------------------------------------------------------
+        # AUDIO ANALYSIS (New Phase)
+        # ---------------------------------------------------------------------
+        from backend.services.audio_service import audio_service
+        
+        print("  Starting Audio Analysis...")
+        audio_events = audio_service.analyze_video(video_path)
+        print(f"  Audio Analysis Complete. Found {len(audio_events)} events.")
+        
+        # Merge Video and Audio Events
+        # We just append them. The frontend sorts by timestamp.
+        all_events = events + audio_events
+        
+        # Sort by timestamp
+        all_events.sort(key=lambda x: x['timestamp'])
+
         # Save results
         record = {
             "id": f"vid_{int(time.time())}",
             "filename": video_filename,
             "processed_at": datetime.now().isoformat(),
-            "events": events
+            "events": all_events
         }
         
         metadata_db.append(record)

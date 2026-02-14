@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Brain, Play, Clock, AlertTriangle } from 'lucide-react';
+import { Search, Brain, Play, Clock, AlertTriangle, Activity } from 'lucide-react';
 
 const IntelligencePanel = () => {
     const [activeTab, setActiveTab] = useState('latest'); // 'latest' or 'search'
@@ -149,24 +149,49 @@ const IntelligencePanel = () => {
                         }
                     }
 
+                    const isAudioEvent = item.provider === 'audio-ast';
+                    const isGunshot = item.description.toLowerCase().includes('gunshot');
+                    const isScream = item.description.toLowerCase().includes('scream');
+                    const isGlass = item.description.toLowerCase().includes('glass');
+
                     return (
                         <div
                             key={idx}
                             onClick={() => setSelectedVideo(item)}
-                            className={`group bg-black/40 border ${borderColor} rounded-lg p-3 hover:border-cyan-500/50 hover:bg-gray-900 cursor-pointer transition-all mb-2 relative overflow-hidden`}
+                            className={`group border ${borderColor} rounded-lg p-3 cursor-pointer transition-all mb-2 relative overflow-hidden 
+                                ${isAudioEvent ? 'bg-indigo-900/20 border-indigo-500/30 hover:bg-indigo-900/40' : 'bg-black/40 hover:bg-gray-900 hover:border-cyan-500/50'}
+                            `}
                         >
+                            {/* Audio Waveform Decoration */}
+                            {isAudioEvent && (
+                                <div className="absolute -right-4 -top-4 opacity-10 text-indigo-500 transform rotate-12">
+                                    <Activity size={64} />
+                                </div>
+                            )}
+
                             <div className="flex justify-between items-start mb-2 relative z-10">
-                                <span className="text-[10px] font-mono text-cyan-500/80 bg-cyan-950/30 px-1.5 py-0.5 rounded border border-cyan-900/50">
-                                    {item.filename.split('-').pop()}
+                                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border 
+                                    ${isAudioEvent ? 'text-indigo-300 bg-indigo-900/50 border-indigo-700' : 'text-cyan-500/80 bg-cyan-950/30 border-cyan-900/50'}`}>
+                                    {isAudioEvent ? 'AUDIO DETECTED' : item.filename.split('-').pop()}
                                 </span>
                                 <span className="text-[10px] font-mono text-gray-500 bg-black/50 px-2 py-0.5 rounded">
                                     {typeof item.timestamp === 'number' ? item.timestamp.toFixed(1) : item.timestamp}s
                                 </span>
                             </div>
 
-                            <p className="text-xs text-gray-300 line-clamp-2 leading-relaxed opacity-90 group-hover:text-white transition-opacity">
-                                {item.description}
-                            </p>
+                            <div className="flex items-start gap-2 relative z-10">
+                                {isAudioEvent && (
+                                    <div className="mt-0.5 min-w-[20px]">
+                                        {isGunshot && <span className="text-lg">🔫</span>}
+                                        {isScream && <span className="text-lg">🗣️</span>}
+                                        {isGlass && <span className="text-lg">🪟</span>}
+                                        {!isGunshot && !isScream && !isGlass && <span className="text-lg">🔊</span>}
+                                    </div>
+                                )}
+                                <p className={`text-xs line-clamp-2 leading-relaxed opacity-90 transition-opacity ${isAudioEvent ? 'text-indigo-200 group-hover:text-white' : 'text-gray-300 group-hover:text-white'}`}>
+                                    {item.description}
+                                </p>
+                            </div>
 
                             {item.score !== undefined && (
                                 <div className="mt-3 flex items-center justify-between border-t border-gray-800 pt-2">
@@ -180,9 +205,9 @@ const IntelligencePanel = () => {
                                 </div>
                             )}
 
-                            {/* Threat Tags (if available in description or structured data) */}
+                            {/* Threat Tags (Video & Audio) */}
                             <div className="flex gap-1 mt-2 flex-wrap">
-                                {['gun', 'knife', 'weapon', 'fight', 'punch', 'altercation', 'blood'].map(keyword => {
+                                {['gun', 'knife', 'weapon', 'fight', 'punch', 'altercation', 'blood', 'scream', 'glass', 'explosion'].map(keyword => {
                                     if (item.description.toLowerCase().includes(keyword)) {
                                         return (
                                             <span key={keyword} className="text-[9px] px-1.5 py-0.5 bg-red-500/20 text-red-200 border border-red-500/30 rounded uppercase font-bold tracking-wider">
