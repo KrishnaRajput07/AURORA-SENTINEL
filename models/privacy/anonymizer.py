@@ -95,15 +95,14 @@ class PrivacyAnonymizer:
             face_region = result[y:y+h, x:x+w]
             
             try:
-                # Premium Multi-Pass Blur
-                # 1. Box Blur (Pre-pass)
-                box_blurred = cv2.blur(face_region, (25, 25))
-                # 2. Strong Gaussian Blur
-                ksize = (int(w/1.5)*2+1, int(h/1.5)*2+1) if w < 100 else (99, 99)
-                final_blur = cv2.GaussianBlur(box_blurred, ksize, 30)
+                # Optimized Single-Pass Blur
+                # Using a smaller kernel and lower sigma to maintain speed
+                ksize = (int(w / 4) * 2 + 1, int(h / 4) * 2 + 1)
+                ksize = (max(3, min(ksize[0], 51)), max(3, min(ksize[1], 51)))
                 
+                final_blur = cv2.GaussianBlur(face_region, ksize, 10)
                 result[y:y+h, x:x+w] = final_blur
-            except:
+            except Exception:
                 pass
         
         return result

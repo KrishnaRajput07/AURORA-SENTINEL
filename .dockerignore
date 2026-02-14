@@ -1,0 +1,21 @@
+.git
+.gitignore
+.env
+venv/
+node_modules/
+frontend/node_modules/
+storage/
+data/
+outputs/
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.db
+aurora.db
+*.mp4
+*.MOV
+*.avi
+# Exclude large local models if they are already in the image via other means or to be downloaded
+# yolov8s.pt (Keep if needed strictly)
+# wepon.pt (Keep if needed strictly)

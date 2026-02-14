@@ -8,6 +8,7 @@ import numpy as np
 import asyncio
 import base64
 from datetime import datetime
+import time # Added for duration measurement
 
 router = APIRouter()
 
@@ -43,7 +44,7 @@ async def websocket_live_feed(websocket: WebSocket):
     print("WebSocket connected (Robust)")
     
     frame_count = 0
-    SKIP_FRAMES = 2 # Process 1 out of every 3 frames
+    SKIP_FRAMES = 1 # Process 1 out of every 2 frames (Increased from 1/3)
     
     # State for deduping alerts (prevent spamming DB)
     last_alert_time = 0
@@ -66,7 +67,7 @@ async def websocket_live_feed(websocket: WebSocket):
 
             if not ml_service.detector:
                 await websocket.send_json({"error": "Models Loading..."})
-                await asyncio.sleep(1) # Backoff
+                await asyncio.sleep(0.5) # Reduced backoff
                 continue
 
             # Decode frame
@@ -79,17 +80,13 @@ async def websocket_live_feed(websocket: WebSocket):
             # Optimization: Use native resolution (do not force upscale)
             # frame = cv2.resize(frame, (640, 480)) 
 
-            # Process every Nth frame
-            # Only skip if we are processing faster than input (simple logic for now: process all or skip less)
-            # If input is 320x240 (Performance Mode), we can process every frame or every 2nd frame.
+            # 3. Dynamic Skip: Adaptive based on processing time
+            # Process frame and measure duration
+            start_proc = time.time()
             
-            # Dynamic Skip: If frame is small, skip less
-            height, width = frame.shape[:2]
-            CURRENT_SKIP = 0 if width <= 320 else SKIP_FRAMES
-
-            if frame_count % (CURRENT_SKIP + 1) == 0:
+            if frame_count % (SKIP_FRAMES + 1) == 0:
                 try:
-                    # 1. Detect Objects/Poses
+                    # 1. Detect Objects/Poses/Weapons (Parallelized)
                     detection = ml_service.detector.process_frame(frame)
                     
                     # 2. Detect Faces
@@ -102,24 +99,20 @@ async def websocket_live_feed(websocket: WebSocket):
                     risk_score = risk_score or 0
                         
                     alert = None
-                    if risk_score > 50:
+                    if risk_score > 65: # New threshold from previous task
                         alert = ml_service.risk_engine.generate_alert(risk_score, risk_factors)
-                        # Ensure level is uppercase for consistency
                         alert['level'] = alert['level'].upper()
                         
-                        # SMART STORAGE: Trigger recording for significant threats
-                        if risk_score > 70:
+                        if risk_score > 80:
                             video_storage_service.start_recording("CAM-01")
                         
-                        # PERSISTENCE: Save to DB if Critical and cooldown passed
                         now = datetime.utcnow().timestamp()
                         if alert and (now - last_alert_time > ALERT_COOLDOWN):
-                            # Run DB write in thread pool to avoid blocking WS loop
                             loop = asyncio.get_event_loop()
                             await loop.run_in_executor(None, save_alert_sync, alert)
                             last_alert_time = now
 
-                    # Always add frame to active recording if any
+                    # Always add frame to active recording
                     video_storage_service.add_frame("CAM-01", frame)
 
                     # Update cache
@@ -127,16 +120,20 @@ async def websocket_live_feed(websocket: WebSocket):
                     cached_result["risk_score"] = risk_score
                     cached_result["alert"] = alert
                     cached_result["faces"] = faces
-                
                 except Exception as e:
                     print(f"ML Processing Failed: {e}")
-                    # Keep valid cache data but maybe reset score?
-                    # Using cached is safer to prevent flashing
             else:
                 detection = cached_result["detection"]
                 risk_score = cached_result["risk_score"]
                 alert = cached_result["alert"]
                 faces = cached_result["faces"]
+
+            proc_duration = time.time() - start_proc
+            # Adapt SKIP_FRAMES: If processing takes > 50ms, skip 1 frame to stay real-time
+            if proc_duration > 0.05:
+                SKIP_FRAMES = 1
+            else:
+                SKIP_FRAMES = 0
 
             frame_count += 1
             
@@ -198,16 +195,19 @@ async def websocket_live_feed(websocket: WebSocket):
             
             # Send results
             try:
-                await websocket.send_json({
-                    "risk_score": risk_score,
-                    "risk_factors": risk_factors, # Added detailed factors
-                    "alert": alert,
-                    "detections": {
-                        "person_count": len(detection.get('poses', [])),
-                        "object_count": len(detection.get('objects', [])),
-                        "weapon_count": len(detection.get('weapons', []))
-                    }
-                })
+                # Only send full metadata every 3 frames to save bandwidth/CPU
+                if frame_count % 3 == 0 or alert is not None:
+                    await websocket.send_json({
+                        "risk_score": risk_score,
+                        "risk_factors": risk_factors,
+                        "alert": alert,
+                        "detections": {
+                            "person_count": len(detection.get('poses', [])),
+                            "object_count": len(detection.get('objects', [])),
+                            "weapon_count": len(detection.get('weapons', []))
+                        }
+                    })
+                # Then the heavy frame data
                 await websocket.send_bytes(buffer.tobytes())
             except Exception:
                 break # Socket likely closed during send

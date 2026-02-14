@@ -37,6 +37,7 @@ class MLService:
         try:
             if UnifiedDetector:
                 self.detector = UnifiedDetector()
+                self.detector.warmup() # NEW: Initialize CUDA and weights
                 self.risk_engine = RiskScoringEngine()
                 self.anonymizer = PrivacyAnonymizer()
                 self.loaded = True

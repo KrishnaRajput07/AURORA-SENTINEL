@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, Grid, Card, CardContent, CardMedia, IconButton, Tab, Tabs, alpha, useTheme, Button, CircularProgress, Dialog } from '@mui/material';
 import { Play, Trash2, Download, FileVideo, Clock, RefreshCw, HardDrive, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { API_BASE_URL } from '../config';
 
 const ArchiveGallery = () => {
     const [clips, setClips] = useState([]);
@@ -17,7 +18,7 @@ const ArchiveGallery = () => {
     const fetchClips = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`http://localhost:8000/archive/list?source=${tab}`);
+            const response = await fetch(`${API_BASE_URL}/archive/list?source=${tab}`);
             const data = await response.json();
             setClips(data.clips || []);
         } catch (error) {
@@ -29,7 +30,7 @@ const ArchiveGallery = () => {
 
     const handleDownload = (clip) => {
         const link = document.createElement('a');
-        link.href = `http://localhost:8000${clip.url}`;
+        link.href = `${API_BASE_URL}${clip.url}`;
         link.download = clip.name;
         document.body.appendChild(link);
         link.click();
@@ -175,7 +176,7 @@ const ArchiveGallery = () => {
                 <Box sx={{ position: 'relative', pt: '56.25%', bgcolor: '#000' }}>
                     {selectedClip && (
                         <video
-                            src={`http://localhost:8000${selectedClip.url}`}
+                            src={`${API_BASE_URL}${selectedClip.url}`}
                             controls
                             autoPlay
                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}

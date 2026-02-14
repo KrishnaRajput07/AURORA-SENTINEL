@@ -24,7 +24,7 @@ def draw_skeleton(frame, kpts, conf):
         if i < len(conf) and conf[i] > 0.4:
             cv2.circle(frame, (int(x), int(y)), 3, (0, 0, 255), -1)
 
-async def process_video_file_task(video_path: str):
+async def process_video_file_task(video_path: str, context_params: dict = None):
     if not ml_service.detector:
         return {"error": "Models not loaded", "alerts": [], "processed_url": "", "metrics": {}}
 
@@ -38,7 +38,7 @@ async def process_video_file_task(video_path: str):
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
     out_name = f"proc_{os.path.basename(video_path)}"
-    out_dir = os.path.join("storage", "processed")
+    out_dir = os.path.abspath(os.getenv("PROCESSED_PATH", "storage/processed"))
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, out_name)
     
@@ -63,7 +63,7 @@ async def process_video_file_task(video_path: str):
             if frame_count % 6 == 0:
                 det = ml_service.detector.process_frame(frame)
                 timestamp = frame_count / fps
-                risk, facts = video_engine.calculate_risk(det, {
+                risk, facts = video_engine.calculate_risk(det, context_params or {
                     'hour': datetime.now().hour,
                     'timestamp': timestamp
                 })
@@ -89,7 +89,7 @@ async def process_video_file_task(video_path: str):
                 for p in det['poses']:
                     draw_skeleton(frame, np.array(p['keypoints']), np.array(p['confidence']))
                 
-                if risk > 20: # Lowered threshold for internal metrics to ensure visibility
+                if risk > 35: # Increased from 20 to reduce sensitivity
                     alt = video_engine.generate_alert(risk, facts)
                     alt['level'] = alt['level'].upper() # Standardize
                     alt['timestamp_seconds'] = frame_count / fps
@@ -120,26 +120,36 @@ async def process_video_file_task(video_path: str):
     }
 
 @router.post("/process/video")
-async def process_video(file: UploadFile = File(...)):
+async def process_video(
+    file: UploadFile = File(...),
+    location_type: str = "public",
+    sensitivity: float = 1.0,
+    hour: int = None
+):
     try:
-        os.makedirs("storage/temp", exist_ok=True)
+        temp_dir = os.getenv("TEMP_PATH", "storage/temp")
+        os.makedirs(temp_dir, exist_ok=True)
         # Use a stable path instead of tempfile to avoid handle/permission issues on Windows
         safe_filename = file.filename.replace(" ", "_").replace("(", "").replace(")", "")
-        v_path = os.path.abspath(os.path.join("storage", "temp", f"raw_{datetime.now().timestamp()}_{safe_filename}"))
+        v_path = os.path.abspath(os.path.join(temp_dir, f"raw_{datetime.now().timestamp()}_{safe_filename}"))
         
         with open(v_path, "wb") as b: 
             content = await file.read()
             b.write(content)
         
-        print(f"DEBUG: Processing video at {v_path}")
-        results = await process_video_file_task(v_path)
+        print(f"DEBUG: Processing video at {v_path} with context: {location_type}, {sensitivity}, {hour}")
+        results = await process_video_file_task(v_path, {
+            'location_type': location_type,
+            'sensitivity': sensitivity,
+            'hour': hour if hour is not None else datetime.now().hour
+        })
         
         # PERSISTENCE & SMART BIN
         print(f"DEBUG: Alerts found: {results.get('alerts_found', 0)}")
         if results.get("alerts_found", 0) > 0:
             peak_alert = max(results["alerts"], key=lambda x: x['score'])
             print(f"DEBUG: Peak Score detected: {peak_alert['score']}%")
-            if peak_alert['score'] >= 30: # Use >= 30 as requested
+            if peak_alert['score'] >= 45: # Increased from 30 to reduce sensitivity
                 try:
                     db = SessionLocal()
                     factors = {
@@ -167,7 +177,7 @@ async def process_video(file: UploadFile = File(...)):
                     print(f"SUCCESS: Forensic Alert Persisted. ID: {new_alert.id}")
                     
                     # SMART BIN: Move to secure storage
-                    bin_dir = os.path.abspath(os.path.join("storage", "bin"))
+                    bin_dir = os.path.abspath(os.getenv("BIN_PATH", "storage/bin"))
                     os.makedirs(bin_dir, exist_ok=True)
                     bin_filename = f"threat_{int(datetime.now().timestamp())}_{safe_filename}"
                     bin_path = os.path.join(bin_dir, bin_filename)

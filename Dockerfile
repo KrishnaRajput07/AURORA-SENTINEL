@@ -1,30 +1,36 @@
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+# --- Stage 1: Build Frontend ---
+FROM node:18-alpine AS frontend-builder
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm install --frozen-lockfile
+COPY frontend/ ./
+RUN npm run build
 
-# Install Python and system dependencies
+# --- Stage 2: Final Image (CPU Optimized for 4GB Limit) ---
+FROM python:3.10-slim
+
+# Install system dependencies and clean up in one layer
 RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-pip \
     ffmpeg \
     libsm6 \
     libxext6 \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+    libgl1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
-RUN python3.10 -m pip install --upgrade pip
-
-# Install PyTorch (GPU version)
-RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-
-# Copy requirements first for caching
-COPY requirements.txt /app/requirements.txt
 WORKDIR /app
 
-# Install other dependencies
-RUN pip3 install -r requirements.txt
+# Install CPU-only PyTorch (Save ~2.5GB vs CUDA version)
+RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-# Copy project files
-COPY . /app
+# Copy requirements & install others
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Copy project files (Respects .dockerignore)
+COPY . .
+
+# Copy frontend build from Stage 1
+COPY --from=frontend-builder /frontend/build ./frontend/build
 
 # Expose API port
 EXPOSE 8000
