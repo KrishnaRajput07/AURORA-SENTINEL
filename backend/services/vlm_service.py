@@ -17,7 +17,7 @@ class GeminiProvider(VLMProvider):
         else:
             genai.configure(api_key=api_key)
             # Use Flash as confirmed by user (high rate limits)
-            self.model = genai.GenerativeModel('gemini-2.0-flash-exp') 
+            self.model = genai.GenerativeModel('gemini-2.0-flash') 
 
     def analyze(self, image, prompt):
         if not hasattr(self, 'model'):
