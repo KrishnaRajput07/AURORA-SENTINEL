@@ -2,33 +2,34 @@
 FROM node:18-alpine AS frontend-builder
 WORKDIR /frontend
 COPY frontend/package*.json ./
-RUN npm install
+RUN npm install --frozen-lockfile
 COPY frontend/ ./
 RUN npm run build
 
-# --- Stage 2: Final Image ---
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+# --- Stage 2: Final Image (GPU Supported) ---
+# Using a runtime-only image to save space
+FROM nvidia/cuda:11.8.0-base-ubuntu22.04
 
-# Install Python and system dependencies
+# Install Python and minimal system dependencies
 RUN apt-get update && apt-get install -y \
     python3.10 \
     python3-pip \
     ffmpeg \
     libsm6 \
     libxext6 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Upgrade pip
-RUN python3.10 -m pip install --upgrade pip
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy requirements & install
-COPY requirements.txt .
-RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-RUN pip3 install -r requirements.txt
+# Install PyTorch (GPU version) - This is the largest part
+# We use --no-cache-dir to prevent large cache files from staying in the image
+RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
-# Copy project files
+# Copy requirements & install others
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Copy project files (Respects .dockerignore)
 COPY . .
 
 # Copy frontend build from Stage 1
@@ -37,5 +38,5 @@ COPY --from=frontend-builder /frontend/build ./frontend/build
 # Expose API port
 EXPOSE 8000
 
-# Start command (Backend serves frontend)
+# Start command
 CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
