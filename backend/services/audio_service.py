@@ -111,11 +111,9 @@ class AudioService:
                 if len(chunk) < sr: # Skip < 1 sec
                     continue
                     
-                # Save temp chunk
-                sf.write("temp_chunk.wav", chunk, sr)
-                
-                # Predict
-                results = self.pipeline("temp_chunk.wav", top_k=5)
+                # Predict directly on numpy array
+                # Pipeline accepts dict with array/sampling_rate to bypass ffmpeg file loading
+                results = self.pipeline({"array": chunk, "sampling_rate": sr}, top_k=5)
                 
                 # Check for threats
                 timestamp = i / sr
