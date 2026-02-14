@@ -74,7 +74,11 @@ class SearchService:
                     "id": results['ids'][0][i],
                     "description": results['documents'][0][i],
                     "metadata": results['metadatas'][0][i],
-                    "score": results['distances'][0][i] # Smaller is better for L2, but Chroma might return different distance
+                    # Chroma returns L2 distance by default (smaller is better).
+                    # Convert to similarity score (0 to 1).
+                    # A distance of 0 means identical. A distance of >1.5 is usually unrelated.
+                    # Simple heuristic: score = 1 - (distance / 2) clamped to 0
+                    "score": max(0, 1 - (results['distances'][0][i] / 1.8))
                 })
         
         return hits

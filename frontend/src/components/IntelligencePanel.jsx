@@ -137,11 +137,16 @@ const IntelligencePanel = () => {
                     let scoreDisplay = 0;
 
                     if (item.score !== undefined) {
-                        // Normalized display (assuming score is distance-like or similarity)
-                        // Let's assume similarity for now.
+                        // Score is now 0-1 normalized from backend
                         scoreDisplay = Math.round(item.score * 100);
-                        if (scoreDisplay > 40) { confidenceColor = 'text-red-400'; borderColor = 'border-red-900/50'; }
-                        else if (scoreDisplay > 25) { confidenceColor = 'text-yellow-400'; borderColor = 'border-yellow-900/50'; }
+
+                        if (scoreDisplay > 70) {
+                            confidenceColor = 'text-red-400';
+                            borderColor = 'border-red-900/50';
+                        } else if (scoreDisplay > 50) {
+                            confidenceColor = 'text-yellow-400';
+                            borderColor = 'border-yellow-900/50';
+                        }
                     }
 
                     return (
@@ -166,8 +171,8 @@ const IntelligencePanel = () => {
                             {item.score !== undefined && (
                                 <div className="mt-3 flex items-center justify-between border-t border-gray-800 pt-2">
                                     <div className="flex items-center gap-2">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${scoreDisplay > 30 ? 'bg-red-500 animate-pulse' : 'bg-gray-600'}`}></div>
-                                        <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Relevance</span>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${scoreDisplay > 60 ? 'bg-red-500 animate-pulse' : 'bg-gray-600'}`}></div>
+                                        <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Confidence</span>
                                     </div>
                                     <span className={`text-base font-bold font-mono ${confidenceColor}`}>
                                         {scoreDisplay}%
@@ -177,7 +182,7 @@ const IntelligencePanel = () => {
 
                             {/* Threat Tags (if available in description or structured data) */}
                             <div className="flex gap-1 mt-2 flex-wrap">
-                                {['gun', 'knife', 'weapon', 'fight', 'punch'].map(keyword => {
+                                {['gun', 'knife', 'weapon', 'fight', 'punch', 'altercation', 'blood'].map(keyword => {
                                     if (item.description.toLowerCase().includes(keyword)) {
                                         return (
                                             <span key={keyword} className="text-[9px] px-1.5 py-0.5 bg-red-500/20 text-red-200 border border-red-500/30 rounded uppercase font-bold tracking-wider">
