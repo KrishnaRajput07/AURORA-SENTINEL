@@ -6,24 +6,21 @@ RUN npm install --frozen-lockfile
 COPY frontend/ ./
 RUN npm run build
 
-# --- Stage 2: Final Image (GPU Supported) ---
-# Using a runtime-only image to save space
-FROM nvidia/cuda:11.8.0-base-ubuntu22.04
+# --- Stage 2: Final Image (CPU Optimized for 4GB Limit) ---
+FROM python:3.10-slim
 
-# Install Python and minimal system dependencies
+# Install system dependencies and clean up in one layer
 RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-pip \
     ffmpeg \
     libsm6 \
     libxext6 \
+    libgl1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install PyTorch (GPU version) - This is the largest part
-# We use --no-cache-dir to prevent large cache files from staying in the image
-RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# Install CPU-only PyTorch (Save ~2.5GB vs CUDA version)
+RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 # Copy requirements & install others
 COPY requirements.txt .
