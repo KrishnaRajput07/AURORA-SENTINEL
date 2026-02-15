@@ -87,13 +87,9 @@ const LiveFeed = () => {
     // WebSocket & Loop
     useEffect(() => {
         const connect = () => {
-<<<<<<< HEAD
             // Dynamic URL based on mode
             const url = vlmMode ? `ws://localhost:8000/vlm/vlm-feed` : `ws://localhost:8000/ws/live-feed`;
             const ws = new WebSocket(url);
-=======
-            const ws = new WebSocket(`${WS_BASE_URL}/ws/live-feed`);
->>>>>>> origin/main
             wsRef.current = ws;
 
             ws.onopen = () => setIsConnected(true);
