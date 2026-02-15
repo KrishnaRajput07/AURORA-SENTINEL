@@ -251,9 +251,9 @@ const LiveFeed = () => {
 
                 <Box sx={{
                     position: 'absolute',
-                    bottom: 16,
-                    left: 16,
-                    right: 16,
+                    bottom: 36,
+                    left: 24,
+                    right: 24,
                     height: 72,
                     background: `linear-gradient(to top, ${alpha(getRiskColor(currentScore), 0.9)} 0%, ${alpha(getRiskColor(currentScore), 0.4)} 100%)`,
                     backdropFilter: 'blur(16px)',
