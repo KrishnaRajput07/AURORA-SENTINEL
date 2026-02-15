@@ -59,7 +59,15 @@ class PrivacyAnonymizer:
                 gray, scaleFactor=1.2, minNeighbors=5, minSize=(30, 30)
             )
             for (x, y, w, h) in haar_faces:
-                face_rects.append((x, y, w, h))
+                # Apply padding to Haar too!
+                padding = h * 0.3 
+                x = max(0, int(x - padding))
+                y = max(0, int(y - padding))
+                w = min(frame.shape[1] - x, int(w + 2*padding))
+                h = min(frame.shape[0] - y, int(h + 2*padding))
+                
+                if w > 0 and h > 0:
+                    face_rects.append((x, y, w, h))
                 
         return face_rects
 

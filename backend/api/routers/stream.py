@@ -92,7 +92,8 @@ async def websocket_live_feed(websocket: WebSocket):
                     # 2. Detect Faces
                     faces = []
                     if ml_service.anonymizer:
-                        faces = ml_service.anonymizer.detect_faces(frame)
+                        # Use YOLO poses for better face detection (uses the robust padding logic)
+                        faces = ml_service.anonymizer.detect_faces(frame, poses=detection.get('poses'))
                     
                     # 3. Calculate Risk
                     risk_score, risk_factors = ml_service.risk_engine.calculate_risk(detection)
