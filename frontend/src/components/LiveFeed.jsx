@@ -249,7 +249,22 @@ const LiveFeed = () => {
                 </Fade>
 
 
-                <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 72, background: `linear-gradient(to top, ${alpha(getRiskColor(currentScore), 0.9)} 0%, ${alpha(getRiskColor(currentScore), 0.4)} 100%)`, backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4 }}>
+                <Box sx={{
+                    position: 'absolute',
+                    bottom: 16,
+                    left: 16,
+                    right: 16,
+                    height: 72,
+                    background: `linear-gradient(to top, ${alpha(getRiskColor(currentScore), 0.9)} 0%, ${alpha(getRiskColor(currentScore), 0.4)} 100%)`,
+                    backdropFilter: 'blur(16px)',
+                    borderRadius: 3,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    px: 4,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                }}>
                     <Box sx={{ display: 'flex', gap: 4 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}><User size={18} color="#fff" /><Typography variant="h6" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace' }}>{metadata?.detections?.person_count || 0}</Typography></Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}><BoxIcon size={18} color="#fff" /><Typography variant="h6" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace' }}>{metadata?.detections?.object_count || 0}</Typography></Box>
