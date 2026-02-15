@@ -218,70 +218,101 @@ const IntelligencePanel = () => {
                     const isScream = item.description.toLowerCase().includes('scream');
                     const isGlass = item.description.toLowerCase().includes('glass');
 
+                    // Clean JSON artifacts from description if present
+                    let cleanDescription = item.description;
+                    if (cleanDescription.trim().startsWith('```json')) {
+                        cleanDescription = cleanDescription.replace(/```json/g, '').replace(/```/g, '').trim();
+                        try {
+                            const parsed = JSON.parse(cleanDescription);
+                            cleanDescription = parsed.summary || cleanDescription;
+                        } catch (e) { /* keep original */ }
+                    }
+                    if (cleanDescription.trim().startsWith('{')) {
+                        try {
+                            const parsed = JSON.parse(cleanDescription);
+                            cleanDescription = parsed.summary || cleanDescription;
+                        } catch (e) { /* keep original */ }
+                    }
+
                     return (
                         <div
                             key={idx}
                             onClick={() => setSelectedVideo(item)}
-                            className={`group border ${borderColor} rounded-lg p-3 cursor-pointer transition-all mb-2 relative overflow-hidden 
-                                ${isAudioEvent ? 'bg-indigo-900/20 border-indigo-500/30 hover:bg-indigo-900/40' : 'bg-black/40 hover:bg-gray-900 hover:border-cyan-500/50'}
+                            className={`group rounded-lg p-4 cursor-pointer transition-all mb-4 relative overflow-hidden border border-transparent hover:border-cyan-500/30
+                                ${isAudioEvent ? 'bg-indigo-900/10' : 'bg-black/40'}
                             `}
                         >
                             {/* Audio Waveform Decoration */}
                             {isAudioEvent && (
                                 <div className="absolute -right-4 -top-4 opacity-10 text-indigo-500 transform rotate-12">
-                                    <Activity size={64} />
+                                    <Activity size={80} />
                                 </div>
                             )}
 
-                            <div className="flex justify-between items-start mb-2 relative z-10">
-                                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border 
-                                    ${isAudioEvent ? 'text-indigo-300 bg-indigo-900/50 border-indigo-700' : 'text-cyan-500/80 bg-cyan-950/30 border-cyan-900/50'}`}>
-                                    {isAudioEvent ? 'AUDIO DETECTED' : item.filename.split('-').pop()}
+                            {/* Header: Filename and Time */}
+                            <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
+                                <span className={`text-sm font-bold tracking-wide 
+                                    ${isAudioEvent ? 'text-indigo-400' : 'text-cyan-400'}`}>
+                                    {isAudioEvent ? 'AUDIO EVENT' : item.filename}
                                 </span>
-                                <span className="text-[10px] font-mono text-gray-500 bg-black/50 px-2 py-0.5 rounded">
-                                    {typeof item.timestamp === 'number' ? item.timestamp.toFixed(1) : item.timestamp}s
-                                </span>
-                            </div>
-
-                            <div className="flex items-start gap-2 relative z-10">
-                                {isAudioEvent && (
-                                    <div className="mt-0.5 min-w-[20px]">
-                                        {isGunshot && <span className="text-lg">🔫</span>}
-                                        {isScream && <span className="text-lg">🗣️</span>}
-                                        {isGlass && <span className="text-lg">🪟</span>}
-                                        {!isGunshot && !isScream && !isGlass && <span className="text-lg">🔊</span>}
-                                    </div>
-                                )}
-                                <p className={`text-xs line-clamp-2 leading-relaxed opacity-90 transition-opacity ${isAudioEvent ? 'text-indigo-200 group-hover:text-white' : 'text-gray-300 group-hover:text-white'}`}>
-                                    {item.description}
-                                </p>
-                            </div>
-
-                            {item.score !== undefined && (
-                                <div className="mt-3 flex items-center justify-between border-t border-gray-800 pt-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${scoreDisplay > 60 ? 'bg-red-500 animate-pulse' : 'bg-gray-600'}`}></div>
-                                        <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Confidence</span>
-                                    </div>
-                                    <span className={`text-base font-bold font-mono ${confidenceColor}`}>
-                                        {scoreDisplay}%
+                                <div className="flex items-center gap-2">
+                                    <Clock size={12} className="text-gray-600" />
+                                    <span className="text-xs font-mono text-gray-500">
+                                        {typeof item.timestamp === 'number' ? item.timestamp.toFixed(1) : item.timestamp}s
                                     </span>
                                 </div>
-                            )}
-
-                            {/* Threat Tags (Video & Audio) */}
-                            <div className="flex gap-1 mt-2 flex-wrap">
-                                {['gun', 'knife', 'weapon', 'fight', 'punch', 'altercation', 'blood', 'scream', 'glass', 'explosion'].map(keyword => {
-                                    if (item.description.toLowerCase().includes(keyword)) {
-                                        return (
-                                            <span key={keyword} className="text-[9px] px-1.5 py-0.5 bg-red-500/20 text-red-200 border border-red-500/30 rounded uppercase font-bold tracking-wider">
-                                                {keyword}
-                                            </span>
-                                        )
-                                    }
-                                    return null;
-                                })}
                             </div>
+
+                            {/* Main Content: Description */}
+                            <div className="mb-3">
+                                <div className="flex items-start gap-3">
+                                    {isAudioEvent ? (
+                                        <div className="mt-1">
+                                            {isGunshot && <span className="text-xl">🔫</span>}
+                                            {isScream && <span className="text-xl">🗣️</span>}
+                                            {isGlass && <span className="text-xl">🪟</span>}
+                                            {!isGunshot && !isScream && !isGlass && <span className="text-xl">🔊</span>}
+                                        </div>
+                                    ) : (
+                                        <div className="mt-1 text-gray-600">
+                                            <Play size={16} />
+                                        </div>
+                                    )}
+
+                                    <p className={`text-sm leading-relaxed opacity-90 ${isAudioEvent ? 'text-indigo-100' : 'text-gray-300'}`}>
+                                        {cleanDescription}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Footer: Tags and Score */}
+                            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-800/50">
+                                {/* Threat Tags */}
+                                <div className="flex gap-2 flex-wrap">
+                                    {['gun', 'knife', 'weapon', 'fight', 'punch', 'altercation', 'blood', 'scream', 'glass', 'explosion'].map(keyword => {
+                                        if (item.description.toLowerCase().includes(keyword)) {
+                                            return (
+                                                <span key={keyword} className="text-[10px] px-2 py-0.5 bg-red-500/20 text-red-300 border border-red-500/30 rounded uppercase font-bold tracking-wider">
+                                                    {keyword}
+                                                </span>
+                                            )
+                                        }
+                                        return null;
+                                    })}
+                                </div>
+
+                                {item.score !== undefined && (
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${scoreDisplay > 60 ? 'bg-red-500 animate-pulse' : 'bg-gray-600'}`}></div>
+                                        <span className={`text-xs font-bold font-mono ${confidenceColor}`}>
+                                            {scoreDisplay}% CONTEX
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Bottom Divider Line (Visual Separation) */}
+                            <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-900/30 to-transparent mt-4"></div>
                         </div>
                     );
                 })}
