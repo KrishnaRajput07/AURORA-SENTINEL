@@ -117,7 +117,7 @@ class OfflineProcessor:
                 
                 def extract_json(text):
                     try:
-                        # 1. Strip Markdown Code Blocks
+                        # 1. Strip Markdown Code Blocks (```json ... ```)
                         text = re.sub(r'```json\s*', '', text, flags=re.IGNORECASE)
                         text = re.sub(r'```\s*', '', text)
                         
@@ -138,11 +138,19 @@ class OfflineProcessor:
                 json_obj = extract_json(raw_text)
                 
                 if json_obj:
-                    parsed_data = json_obj
+                    # Success!
+                    parsed_data = {
+                        "summary": json_obj.get("summary", "No summary provided"),
+                        "threats": json_obj.get("threats", []),
+                        "severity": json_obj.get("severity", "low").lower(),
+                        "confidence": json_obj.get("confidence", 0)
+                    }
                 else:
                     # Fallback for plain text or failed parse
+                    # If raw_text is really just markdown JSON that failed regex, we might still want to clean it for display
+                    clean_text = raw_text.replace('```json', '').replace('```', '').strip()
                     parsed_data = {
-                        "summary": raw_text,
+                        "summary": clean_text[:200] + "..." if len(clean_text) > 200 else clean_text,
                         "threats": [],
                         "severity": "unknown",
                         "confidence": 0
