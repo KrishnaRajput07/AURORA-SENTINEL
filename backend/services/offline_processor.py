@@ -76,33 +76,39 @@ class OfflineProcessor:
                 
                 # Prompt - STRICT JSON & THREAT DETECTION
                 # Prompt - ENHANCED FORENSIC ANALYSIS
+                # prompt = (
+                #     "You are a critical surveillance AI. Analyze this scene for security threats. "
+                #     "Describe any fighting, weapons, aggression, or suspicious behavior immediately. "
+                #     "Do not use soft language. If people are fighting, say 'Physical Altercation'. "
+                #     "If safe, be concise. Focus on: Weapons, Violence, Crowds, Distress."
+                #     "Analyze this surveillance frame. Return a valid JSON object only. "
+                #     "Format: {\"summary\": \"concise description\", \"threats\": [\"list\", \"of\", \"weapons\", \"or\", \"violence\"], \"severity\": \"low/medium/high\", \"confidence\": 0-100}. "
+                #     "Focus strictly on: Guns, Knives, Fighting, Blood, Fire. "
+                #     "If safe, severity is 'low'. Do not hallucinate."
+                
                 prompt = (
-                    "You are a forensic video analyst.\n"
-                    "You analyze surveillance images for security monitoring.\n\n"
+                    "You are a forensic video analyst."
+                    "You analyze surveillance images for security monitoring."
 
-                    "You are a JSON-only response generator.\n"
-                    "Return a single valid JSON object and NOTHING else.\n"
-                    "No markdown. No explanations. No extra text.\n\n"
+                    "You are a JSON-only response generator."
+                    "Return a single valid JSON object and NOTHING else."
+                    "No markdown. No explanations. No extra text."
 
-                    "TASKS:\n"
-                    "1) SUMMARY: Describe what is happening in the scene. Focus on people, posture, actions, interactions, and likely intent.\n"
-                    "2) THREATS: Look specifically for: Guns (handgun, rifle), knives, fire, blood, and active fighting (punching, kicking).\n"
-                    "3) SEVERITY:\n"
-                    "   - high: visible weapon, active violence, fire.\n"
-                    "   - medium: aggressive posture, ambiguous object, heated dispute.\n"
-                    "   - low: walking, standing, talking, normal behavior.\n\n"
+                    "TASKS:"
+                    "1) SUMMARY: Describe in detail what is happening in the scene. Focus on people, posture, actions, interactions, and likely intent."
+                    "2) THREATS: Look for: firearms, knives, fire, blood, and active fighting (punching, kicking)."
+                    "3) SEVERITY:"
+                    "   - high: visible weapon, active violence, fire."
+                    "   - medium: aggressive posture, ambiguous object, heated dispute."
+                    "   - low: walking, standing, talking, normal behavior."
 
-                    "SCHEMA:\n"
-                    "{\n"
-                    "  \"summary\": \"string\",\n"
-                    "  \"threats\": [\"string\"],\n"
-                    "  \"severity\": \"low\" | \"medium\" | \"high\",\n"
-                    "  \"confidence\": number (0-100)\n"
-                    "}\n\n"
-
-                    "Before responding, validate that the output is valid JSON.\n"
-                    "If invalid, correct it.\n"
-                    "If no threats are found, return an empty threats array []."
+                    "SCHEMA:"
+                    "{"
+                    "  \"summary\": \"string\","
+                    "  \"threats\": [\"string\"],"
+                    "  \"severity\": \"low\" | \"medium\" | \"high\","
+                    "  \"confidence\": number (0-100)"
+                    "}"
                 )
 
 
