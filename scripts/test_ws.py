@@ -3,7 +3,7 @@ import websockets
 import sys
 
 async def test_connection():
-    uri = "ws://localhost:8000/ws/live-feed"
+    uri = "wss://glow-connections-anyone-whereas.trycloudflare.com/ws/live-feed"
     print(f"Attempting to connect to {uri}...")
     try:
         async with websockets.connect(uri) as websocket:

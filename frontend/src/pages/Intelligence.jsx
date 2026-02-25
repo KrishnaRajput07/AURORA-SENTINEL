@@ -459,7 +459,7 @@ const Intelligence = () => {
                         <Box sx={{ position: 'relative', bgcolor: '#000', borderRadius: 4, overflow: 'hidden', boxShadow: '0 30px 60px rgba(0,0,0,0.5)', border: '1px solid #333', minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <video
                                 ref={videoRef}
-                                src={analysisResult?.processed_url ? `http://localhost:8000${analysisResult.processed_url}` : null}
+                                src={analysisResult?.processed_url ? `${API_BASE_URL}${analysisResult.processed_url}` : null}
                                 controls
                                 style={{ width: '100%', maxHeight: '70vh', display: analysisResult?.processed_url ? 'block' : 'none' }}
                                 onError={(e) => {

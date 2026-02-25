@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { Search, Brain, Play, Clock, AlertTriangle, Activity } from 'lucide-react';
 
 const IntelligencePanel = () => {
@@ -18,7 +19,7 @@ const IntelligencePanel = () => {
 
     const fetchLatest = async () => {
         try {
-            const res = await fetch('http://localhost:8000/intelligence/latest');
+            const res = await fetch(`${API_BASE_URL}/intelligence/latest`);
             const data = await res.json();
             setLatestEvents(data);
         } catch (e) {
@@ -33,7 +34,7 @@ const IntelligencePanel = () => {
         setIsSearching(true);
         setActiveTab('search');
         try {
-            const res = await fetch(`http://localhost:8000/intelligence/search?q=${encodeURIComponent(query)}`);
+            const res = await fetch(`${API_BASE_URL}/intelligence/search?q=${encodeURIComponent(query)}`);
             const data = await res.json();
             setResults(data);
         } catch (e) {
@@ -44,7 +45,7 @@ const IntelligencePanel = () => {
     };
 
     const triggerProcessing = async () => {
-        await fetch('http://localhost:8000/intelligence/process', { method: 'POST' });
+        await fetch(`${API_BASE_URL}/intelligence/process`, { method: 'POST' });
         alert("Background processing started! Check terminal for progress.");
     };
 
@@ -59,7 +60,7 @@ const IntelligencePanel = () => {
                     </div>
                     <div className="aspect-video bg-black rounded border border-gray-800 mb-4 relative">
                         <video
-                            src={`http://localhost:8000/recordings/${video.filename}`}
+                            src={`${API_BASE_URL}/recordings/${video.filename}`}
                             controls
                             autoPlay
                             className="w-full h-full object-contain"
@@ -324,3 +325,4 @@ const IntelligencePanel = () => {
 };
 
 export default IntelligencePanel;
+

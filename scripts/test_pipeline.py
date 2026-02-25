@@ -10,7 +10,7 @@ class PipelineTester:
     """
     Test complete pipeline from video upload to alert generation
     """
-    def __init__(self, api_url='http://localhost:8000'):
+    def __init__(self, api_url='https://glow-connections-anyone-whereas.trycloudflare.com'):
         self.api_url = api_url.rstrip('/')
     
     def test_health(self):

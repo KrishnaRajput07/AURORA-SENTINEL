@@ -88,7 +88,7 @@ const LiveFeed = () => {
     useEffect(() => {
         const connect = () => {
             // Dynamic URL based on mode
-            const url = vlmMode ? `ws://localhost:8000/vlm/vlm-feed` : `ws://localhost:8000/ws/live-feed`;
+            const url = vlmMode ? `${WS_BASE_URL}/vlm/vlm-feed` : `${WS_BASE_URL}/ws/live-feed`;
             const ws = new WebSocket(url);
             wsRef.current = ws;
 
