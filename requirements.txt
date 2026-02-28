@@ -1,38 +1,73 @@
-# Core ML
+# ============================================================
+# AURORA SENTINEL — Python Dependencies
+# ============================================================
+# Install with:
+#   pip install -r requirements.txt
+#
+# NOTE: PyTorch (torch, torchvision, torchaudio) is listed below
+# without a CUDA index URL so it installs the CPU build by default.
+# For GPU (CUDA 11.8) acceleration, install PyTorch separately first:
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# then run this file.
+# ============================================================
+
+# ----------------------------------------------------------
+# Core ML / Computer Vision
+# ----------------------------------------------------------
 torch
 torchvision
-ultralytics>=8.0.196
-opencv-python>=4.8.0.76
+torchaudio
+ultralytics>=8.0.196        # YOLOv8 — object detection & pose estimation
+opencv-python>=4.8.0        # Computer vision utilities
 numpy
-pandas
-scikit-learn
+pillow                      # Image handling (PIL)
 scipy
+scikit-learn
+pandas
 
-# Video processing
-ffmpeg-python
-ffmpeg-python
-moviepy
+# ----------------------------------------------------------
+# Audio Processing
+# ----------------------------------------------------------
+moviepy                     # Video/audio extraction
+librosa                     # Audio feature extraction
+soundfile                   # Audio file I/O
+audioread
+
+# ----------------------------------------------------------
+# VLM / AI Providers
+# ----------------------------------------------------------
+google-generativeai         # Google Gemini API (used when VLM_PROVIDER=gemini)
+ollama                      # Ollama Python client (used when VLM_PROVIDER=ollama)
+transformers                # HuggingFace transformers (audio pipeline)
+sentence-transformers       # Semantic embeddings for search
+accelerate                  # HuggingFace model acceleration
+
+# ----------------------------------------------------------
+# Vector Database (Semantic Search)
+# ----------------------------------------------------------
 chromadb
-sentence-transformers
-transformers
-librosa
-soundfile
-accelerate
 
-# Backend
+# ----------------------------------------------------------
+# Backend API
+# ----------------------------------------------------------
 fastapi
 uvicorn[standard]
 pydantic
-python-multipart
+python-multipart             # File upload support
 websockets
+starlette
 
+# ----------------------------------------------------------
 # Database
+# ----------------------------------------------------------
 sqlalchemy
-psycopg2-binary
-redis
+psycopg2-binary             # PostgreSQL driver (optional for local dev, SQLite used by default)
+redis                       # Redis client (optional for local dev)
 
+# ----------------------------------------------------------
 # Utilities
-python-dotenv
-pillow
+# ----------------------------------------------------------
+python-dotenv               # .env file loading
 requests
 tqdm
+ffmpeg-python               # FFmpeg Python wrapper (requires FFmpeg binary in PATH)
