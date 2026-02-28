@@ -31,3 +31,9 @@ data/sample_videos/Normal_Videos_for_Event_Recognition/Normal_Videos_634_x264.mp
 
 # Local Storage
 storage/
+
+# Large model weights — distributed via aurora_large_assets.rar
+*.pt
+
+# Sample data / videos — distributed via aurora_large_assets.rar
+data/
