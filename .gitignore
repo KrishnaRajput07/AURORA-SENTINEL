@@ -37,3 +37,7 @@ storage/
 
 # Sample data / videos — distributed via aurora_large_assets.rar
 data/
+
+# Media files — distributed via aurora_large_assets.rar
+*.png
+*.mp4
