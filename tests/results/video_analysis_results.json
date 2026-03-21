@@ -1,0 +1,118 @@
+{
+  "timestamp": "2026-03-04T12:48:26.391738",
+  "note": "VideoLLaMA3 model downloaded but transformers version incompatible. Showing video properties and motion analysis.",
+  "model_path": "D:\\huggingface\\transformers",
+  "total_videos": 10,
+  "results": [
+    {
+      "video": "fight_0034.mpeg",
+      "expected": "fight",
+      "frames": 16,
+      "fps": 25.0,
+      "duration": 97.96,
+      "avg_motion": 56.41346399980709,
+      "max_motion": 103.12760235821759,
+      "estimated_score": 65,
+      "estimated_type": "potential_fight"
+    },
+    {
+      "video": "fight_0035.mpeg",
+      "expected": "fight",
+      "frames": 16,
+      "fps": 29.97002997002997,
+      "duration": 107.27383333333333,
+      "avg_motion": 58.34275360335705,
+      "max_motion": 77.11334268381682,
+      "estimated_score": 65,
+      "estimated_type": "potential_fight"
+    },
+    {
+      "video": "fight_0081.mpeg",
+      "expected": "fight",
+      "frames": 16,
+      "fps": 29.97002997002997,
+      "duration": 120.0199,
+      "avg_motion": 46.912530140817914,
+      "max_motion": 61.89972439236111,
+      "estimated_score": 65,
+      "estimated_type": "potential_fight"
+    },
+    {
+      "video": "fight_0112.mpeg",
+      "expected": "fight",
+      "frames": 15,
+      "fps": 24.0,
+      "duration": 72.91666666666667,
+      "avg_motion": 54.576051854524074,
+      "max_motion": 82.12578563411897,
+      "estimated_score": 65,
+      "estimated_type": "potential_fight"
+    },
+    {
+      "video": "fight_0131.mpeg",
+      "expected": "fight",
+      "frames": 15,
+      "fps": 25.0,
+      "duration": 49.96,
+      "avg_motion": 66.51679780505951,
+      "max_motion": 85.62966001157407,
+      "estimated_score": 65,
+      "estimated_type": "potential_fight"
+    },
+    {
+      "video": "Normal_Videos_015_x264.mp4",
+      "expected": "normal",
+      "frames": 16,
+      "fps": 30.0,
+      "duration": 16.0,
+      "avg_motion": 2.087777199074074,
+      "max_motion": 3.842521701388889,
+      "estimated_score": 25,
+      "estimated_type": "normal"
+    },
+    {
+      "video": "Normal_Videos_050_x264.mp4",
+      "expected": "normal",
+      "frames": 16,
+      "fps": 30.0,
+      "duration": 139.93333333333334,
+      "avg_motion": 12.455070601851853,
+      "max_motion": 21.07318576388889,
+      "estimated_score": 25,
+      "estimated_type": "normal"
+    },
+    {
+      "video": "Normal_Videos_100_x264.mp4",
+      "expected": "normal",
+      "frames": 16,
+      "fps": 30.0,
+      "duration": 20.9,
+      "avg_motion": 8.903816550925926,
+      "max_motion": 43.2744140625,
+      "estimated_score": 25,
+      "estimated_type": "normal"
+    },
+    {
+      "video": "Normal_Videos_129_x264.mp4",
+      "expected": "normal",
+      "frames": 16,
+      "fps": 30.0,
+      "duration": 15.566666666666666,
+      "avg_motion": 4.7075434027777785,
+      "max_motion": 5.704635416666667,
+      "estimated_score": 25,
+      "estimated_type": "normal"
+    },
+    {
+      "video": "Normal_Videos_150_x264.mp4",
+      "expected": "normal",
+      "frames": 16,
+      "fps": 30.0,
+      "duration": 28.8,
+      "avg_motion": 21.24568460648148,
+      "max_motion": 43.02358072916667,
+      "estimated_score": 25,
+      "estimated_type": "normal"
+    }
+  ]
+}

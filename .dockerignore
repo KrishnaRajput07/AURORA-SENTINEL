@@ -13,6 +13,7 @@ outputs/
 *.pyd
 .db
 aurora.db
+*.mpeg
 *.mp4
 *.MOV
 *.avi

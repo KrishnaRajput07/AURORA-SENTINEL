@@ -23,8 +23,8 @@ WORKDIR /app
 RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 # Copy requirements & install others
-COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+COPY requirements/backend.txt .
+RUN pip3 install --no-cache-dir -r backend.txt
 
 # Copy project files (Respects .dockerignore)
 COPY . .

@@ -1,0 +1,45 @@
+# Core ML
+torch
+torchvision
+ultralytics>=8.0.196
+opencv-python>=4.8.0.76
+numpy
+pandas
+scikit-learn
+scipy
+
+# Video processing
+ffmpeg-python
+ffmpeg-python
+moviepy
+chromadb
+sentence-transformers
+transformers
+librosa
+soundfile
+accelerate
+
+# Backend
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+websockets
+
+# Database
+sqlalchemy
+psycopg2-binary
+redis
+
+# Utilities
+python-dotenv
+pillow
+requests
+tqdm
+google-generativeai
+ollama
+transformers>=4.40.0
+accelerate>=0.30.0
+sentencepiece
+einops
+bitsandbytes

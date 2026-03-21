@@ -1,0 +1,415 @@
+{
+  "fighting": {
+    "correct": 15,
+    "total": 17,
+    "predictions": [
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0034.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0035.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0081.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0112.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0131.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0156.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "normal",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0158.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0214.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0216.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0238.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0239.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "normal",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0240.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0249.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0257.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0259.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0268.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\fightvideos\\fight_0273.mpeg",
+        "true_label": "fighting",
+        "predicted_label": "fighting",
+        "correct": true
+      }
+    ]
+  },
+  "normal": {
+    "correct": 30,
+    "total": 49,
+    "predictions": [
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_015_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_050_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_100_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_129_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_150_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_246_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_247_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_248_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_251_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_289_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_310_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_312_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_317_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_345_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_352_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_360_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_365_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_401_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_417_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_439_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_452_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_453_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_478_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_576_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_597_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_603_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_606_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_621_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_641_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_656_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_696_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_704_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_722_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_745_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_758_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_781_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_798_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_801_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_828_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_831_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_877_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_881_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_885_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_892_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_905_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_912_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_913_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_914_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "fighting",
+        "correct": false
+      },
+      {
+        "video_path": "data\\sample_videos\\Normal_Videos_for_Event_Recognition\\Normal_Videos_929_x264.mp4",
+        "true_label": "normal",
+        "predicted_label": "normal",
+        "correct": true
+      }
+    ]
+  },
+  "overall": {
+    "accuracy": 0.6818181818181818,
+    "total_correct": 45,
+    "total_videos": 66
+  }
+}

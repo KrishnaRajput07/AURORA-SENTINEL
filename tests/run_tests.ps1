@@ -2,6 +2,7 @@
 # AURORA-SENTINEL Test Runner
 # Professional test execution with reporting
 
+Set-Location "$PSScriptRoot\..\.."
 param(
     [string]$Category = "all",  # all, ml, vlm, api, fast, synthetic
     [switch]$Coverage,

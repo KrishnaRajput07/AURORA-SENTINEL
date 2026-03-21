@@ -1,0 +1,21 @@
+# AI Intelligence Layer - Python Dependencies
+# All models run locally, no API calls needed
+
+# Core dependencies
+flask
+flask-cors
+pillow
+
+# HuggingFace Transformers
+transformers
+torch
+torchvision
+
+# Optional: Accelerate for faster loading
+accelerate
+
+# Image processing
+opencv-python
+
+# Note: Models will be downloaded automatically on first use
+# They are cached in ~/.cache/huggingface/
