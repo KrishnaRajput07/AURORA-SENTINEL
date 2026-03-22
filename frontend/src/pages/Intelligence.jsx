@@ -6,6 +6,7 @@ import { useDropzone } from 'react-dropzone';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useIntelligence } from '../context/IntelligenceContext';
+import { useNotifications } from '../context/NotificationContext';
 import IntelligencePanel from '../components/IntelligencePanel'; // NEW
 
 const Intelligence = () => {
@@ -15,15 +16,13 @@ const Intelligence = () => {
         progress, setProgress,
         analysisResult, setAnalysisResult,
         drawerOpen, setDrawerOpen,
-        notification, setNotification,
         seekSeconds, setSeekSeconds
     } = useIntelligence();
 
+    const { addNotification } = useNotifications();
+
     const [searchOpen, setSearchOpen] = React.useState(false); // NEW STATE
     const [locationType, setLocationType] = React.useState('public');
-    const [sensitivity, setSensitivity] = React.useState(1.0);
-    const [analysisHour, setAnalysisHour] = React.useState(new Date().getHours());
-    // const [activeTab, setActiveTab] = useState('summary'); // Not used in render?
     const videoRef = useRef(null);
     const theme = useTheme();
 
@@ -46,8 +45,6 @@ const Intelligence = () => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('location_type', locationType);
-        formData.append('sensitivity', sensitivity);
-        formData.append('hour', analysisHour);
 
         try {
             const timer = setInterval(() => {
@@ -55,9 +52,7 @@ const Intelligence = () => {
             }, 1000);
 
             const queryString = new URLSearchParams({
-                location_type: locationType,
-                sensitivity: sensitivity,
-                hour: analysisHour
+                location_type: locationType
             }).toString();
 
             const response = await fetch(`${API_BASE_URL}/process/video?${queryString}`, {
@@ -70,10 +65,10 @@ const Intelligence = () => {
             setDrawerOpen(true);
 
             if (data.metrics?.fight_probability >= 30) {
-                setNotification({
-                    open: true,
-                    message: "High Risk Detected! Video automatically moved to Smart Bin (Archive).",
-                    severity: "warning"
+                addNotification({
+                    title: "High Risk Detected! Video automatically moved to Smart Bin (Archive).",
+                    level: "Warning",
+                    source: "Forensics"
                 });
             }
         } catch (error) {
@@ -196,9 +191,8 @@ const Intelligence = () => {
     };
 
     return (
-        <Box sx={{ maxWidth: 1600, mx: 'auto', p: { xs: 2, md: 4 } }}>
-            {/* Header */}
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <Box sx={{ width: '100%', p: { xs: 2, md: 4, xl: 6 } }}>
+            <Box sx={{ mb: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
                 <Box>
                     <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-0.04em', color: theme.palette.text.primary, mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
                         Intelligence <Box sx={{ px: 1.5, py: 0.5, bgcolor: theme.palette.primary.main, color: '#fff', borderRadius: 2, fontSize: '0.9rem', fontWeight: 900 }}>v2.0 PRO</Box>
@@ -207,12 +201,41 @@ const Intelligence = () => {
                         Forensic AI pipeline with pose estimation and behavioral tracking.
                     </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button variant="contained" color="secondary" onClick={() => setSearchOpen(true)} startIcon={<Search size={18} />} sx={{ borderRadius: 2, fontWeight: 700 }}>
+
+                {/* Relocated: Action Container (Right aligned) */}
+                <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 2,
+                    bgcolor: alpha(theme.palette.background.paper, 0.6),
+                    backdropFilter: 'blur(16px)',
+                    px: 3, py: 2,
+                    borderRadius: '100px', // Large pill/circle ends
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.06)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                        bgcolor: alpha(theme.palette.background.paper, 0.8),
+                        boxShadow: '0 15px 50px rgba(111, 143, 114, 0.12)',
+                        transform: 'translateY(-3px)'
+                    }
+                }}>
+                    <Button 
+                        variant="contained" 
+                        color="secondary" 
+                        onClick={() => setSearchOpen(true)} 
+                        startIcon={<Search size={18} />} 
+                        sx={{ borderRadius: '100px', fontWeight: 900, px: 3, py: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                    >
                         VLM Search
                     </Button>
                     {analysisResult && (
-                        <Button variant="outlined" onClick={() => setDrawerOpen(true)} startIcon={<Activity size={18} />} sx={{ borderRadius: 2, fontWeight: 700 }}>
+                        <Button 
+                            variant="outlined" 
+                            onClick={() => setDrawerOpen(true)} 
+                            startIcon={<Activity size={18} />} 
+                            sx={{ borderRadius: '100px', fontWeight: 900, px: 3, py: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                        >
                             Open Forensic Player
                         </Button>
                     )}
@@ -221,7 +244,7 @@ const Intelligence = () => {
 
             <Grid container spacing={4}>
                 {/* LEFT COLUMN: Upload & Analysis Results */}
-                <Grid item xs={12} lg={8}>
+                <Grid item xs={12}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {/* Context Settings Section */}
                         {!analysisResult && (
@@ -230,7 +253,7 @@ const Intelligence = () => {
                                     <Shield size={20} color={theme.palette.primary.main} /> Contextual Intelligence Settings
                                 </Typography>
                                 <Grid container spacing={3}>
-                                    <Grid item xs={12} md={5}>
+                                    <Grid item xs={12}>
                                         <Typography variant="caption" sx={{ fontWeight: 900, mb: 1, display: 'block', opacity: 0.6 }}>LOCATION TYPE</Typography>
                                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                             {['public', 'secure_facility', 'private_property'].map((loc) => (
@@ -244,37 +267,6 @@ const Intelligence = () => {
                                                 />
                                             ))}
                                         </Box>
-                                    </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        <Typography variant="caption" sx={{ fontWeight: 900, mb: 1, display: 'block', opacity: 0.6 }}>BASE SENSITIVITY ({sensitivity}x)</Typography>
-                                        <Box sx={{ px: 2 }}>
-                                            <Slider
-                                                min={0.5}
-                                                max={2.0}
-                                                step={0.1}
-                                                value={sensitivity}
-                                                onChange={(e, val) => setSensitivity(val)}
-                                                sx={{ color: theme.palette.primary.main }}
-                                                valueLabelDisplay="auto"
-                                            />
-                                        </Box>
-                                    </Grid>
-                                    <Grid item xs={12} md={3}>
-                                        <Typography variant="caption" sx={{ fontWeight: 900, mb: 1, display: 'block', opacity: 0.6 }}>RECORDING HOUR (0-23)</Typography>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="23"
-                                            value={analysisHour}
-                                            onChange={(e) => setAnalysisHour(parseInt(e.target.value))}
-                                            style={{
-                                                width: '100%',
-                                                padding: '8px',
-                                                borderRadius: '8px',
-                                                border: `1px solid ${alpha(theme.palette.divider, 0.2)} `,
-                                                fontWeight: 800
-                                            }}
-                                        />
                                     </Grid>
                                 </Grid>
                             </Paper>
@@ -340,7 +332,7 @@ const Intelligence = () => {
                                         <Typography variant="h6" sx={{ fontWeight: 900 }}>NEURAL FORENSIC INTELLIGENCE</Typography>
                                     </Box>
                                     <Typography sx={{
-                                        color: '#cbd5e1',
+                                        color: '#000000',
                                         fontSize: '1rem',
                                         lineHeight: 1.7,
                                         fontWeight: 500,
@@ -583,16 +575,6 @@ const Intelligence = () => {
                 `}
             </style>
 
-            <Snackbar
-                open={notification.open}
-                autoHideDuration={6000}
-                onClose={() => setNotification({ ...notification, open: false })}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-            >
-                <Alert severity={notification.severity} variant="filled" sx={{ borderRadius: 3, fontWeight: 700, px: 3 }}>
-                    {notification.message}
-                </Alert>
-            </Snackbar>
         </Box >
     );
 };

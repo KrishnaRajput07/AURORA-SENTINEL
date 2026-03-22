@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -7,7 +7,6 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Mock persistence check
         const savedUser = localStorage.getItem('aurora_user');
         if (savedUser) {
             setUser(JSON.parse(savedUser));
@@ -17,11 +16,7 @@ export const AuthProvider = ({ children }) => {
 
     const [operators, setOperators] = useState(() => {
         const savedOperators = localStorage.getItem('aurora_operators');
-        return savedOperators ? JSON.parse(savedOperators) : [
-            { id: 'OP-4921', name: 'John Doe', status: 'Active', shifts: 'Morning', securityKey: '1234' },
-            { id: 'OP-5502', name: 'Sarah Miller', status: 'Active', shifts: 'Evening', securityKey: '5678' },
-            { id: 'Nonchalant21', name: 'Nonchalant Being', status: 'Active', shifts: 'Elite', securityKey: 'Aryanchutiyahai1', email: 'nonchalantbeinglunacy@gmail.com' }
-        ];
+        return savedOperators ? JSON.parse(savedOperators) : [];
     });
 
     useEffect(() => {
@@ -43,14 +38,15 @@ export const AuthProvider = ({ children }) => {
     const login = (role, customData = null) => {
         const userData = {
             role,
-            id: customData?.id || (role === 'admin' ? 'ADM-001' : 'OP-4921'),
-            name: customData?.name || (role === 'admin' ? 'System Administrator' : 'Operator')
+            id: customData?.id || (role === 'admin' ? 'ADM-001' : 'OP-INIT'),
+            name: customData?.name || (role === 'admin' ? 'System Administrator' : 'Operator Personnel')
         };
         setUser(userData);
         localStorage.setItem('aurora_user', JSON.stringify(userData));
     };
 
     const updateProfile = (newData) => {
+        if (!user) return;
         const updatedUser = { ...user, ...newData };
         setUser(updatedUser);
         localStorage.setItem('aurora_user', JSON.stringify(updatedUser));

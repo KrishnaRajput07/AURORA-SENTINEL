@@ -10,7 +10,6 @@ export const IntelligenceProvider = ({ children }) => {
     const [progress, setProgress] = useState(0);
     const [analysisResult, setAnalysisResult] = useState(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
-    const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
     const [seekSeconds, setSeekSeconds] = useState(null);
 
     const value = {
@@ -19,7 +18,6 @@ export const IntelligenceProvider = ({ children }) => {
         progress, setProgress,
         analysisResult, setAnalysisResult,
         drawerOpen, setDrawerOpen,
-        notification, setNotification,
         seekSeconds, setSeekSeconds
     };
 

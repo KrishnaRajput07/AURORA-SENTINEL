@@ -131,12 +131,32 @@ const LiveFeed = () => {
         };
     }, [performanceMode, vlmMode]); // Re-connect when mode changes
 
+    const lastAlertTimeRef = useRef(0);
+
     const animate = (time) => {
         const frameInterval = performanceMode ? 50 : 33; // ~20fps or ~30fps
         if (time - lastFrameTimeRef.current >= frameInterval) {
             captureAndSend();
             lastFrameTimeRef.current = time;
         }
+
+        // Monitoring risk for notifications
+        if (currentScore >= 75 && Date.now() - lastAlertTimeRef.current > 30000) {
+            addNotification({
+                title: `Critical Threat Detected: ${Math.round(currentScore)}% Risk`,
+                level: 'Critical',
+                source: 'Live Feed'
+            });
+            lastAlertTimeRef.current = Date.now();
+        } else if (currentScore >= 50 && currentScore < 75 && Date.now() - lastAlertTimeRef.current > 60000) {
+            addNotification({
+                title: `Elevated Risk Pattern: ${Math.round(currentScore)}%`,
+                level: 'Warning',
+                source: 'Live Feed'
+            });
+            lastAlertTimeRef.current = Date.now();
+        }
+
         requestRef.current = requestAnimationFrame(animate);
     };
 

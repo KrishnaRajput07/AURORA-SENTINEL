@@ -1,20 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Grid, Paper, Tabs, Tab, Button, List, ListItem, Chip, IconButton, useTheme, alpha, Switch, FormControlLabel, TextField, Avatar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Alert, CircularProgress } from '@mui/material';
-import { Shield, Users, Bell, Settings, FileText, CheckCircle, XCircle, UserPlus, Trash2, Camera, AlertCircle, Save, Activity, HardDrive, Cpu, Zap, Lock } from 'lucide-react';
+import { Box, Typography, Grid, Paper, Tabs, Tab, Button, List, ListItem, Chip, IconButton, useTheme, alpha, Switch, FormControlLabel, TextField, Avatar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Alert, CircularProgress, MenuItem, Slide } from '@mui/material';
+import { FileText, Users, Clock, Zap, Settings, Shield, AlertTriangle, Search, Filter, Lock, Plus, MapPin, Eye, Trash2, Check, X, ShieldAlert, UserPlus, Camera, Activity, HardDrive, Cpu, Save, Bell, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import logoImage from '../assets/logo.png';
 import { API_BASE_URL } from '../config';
 
+const Transition = React.forwardRef(function Transition(props, ref) {
+    return <Slide direction="up" ref={ref} {...props} />;
+});
+
+const RESOLUTION_TYPES = [
+    { value: 'Threat Neutralized', label: 'Threat Neutralized', color: 'success' },
+    { value: 'False Positive', label: 'False Positive', color: 'info' },
+    { value: 'Escalated to Police', label: 'Escalated to Police', color: 'error' },
+    { value: 'Situation Resolved', label: 'Situation Resolved', color: 'success' },
+    { value: 'Equipment Check', label: 'Equipment Check', color: 'warning' },
+];
+
 const AdminDashboard = () => {
     const theme = useTheme();
-    const { operators, addOperator, deleteOperator } = useAuth();
+    const { user, operators, addOperator, deleteOperator } = useAuth();
     const [tab, setTab] = useState(0);
-    const [alerts, setAlerts] = useState([
-        { id: 1, type: 'Aggression', location: 'Gate 4', time: '10:45 AM', operator: 'OP-4921', status: 'Pending' },
-        { id: 2, type: 'Loitering', location: 'Parking B', time: '11:02 AM', operator: 'OP-4921', status: 'Pending' },
-        { id: 3, type: 'Unauthorized', location: 'Server Room', time: '11:15 AM', operator: 'OP-5502', status: 'Resolved' }
-    ]);
+    const [alerts, setAlerts] = useState([]);
 
     const [auditHistory, setAuditHistory] = useState([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
@@ -27,8 +38,43 @@ const AdminDashboard = () => {
         latency: 125
     });
 
+    const fetchAlerts = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/alerts/recent`);
+            const data = await response.json();
+            if (data.alerts) {
+                // Map backend fields to frontend names if necessary
+                const mappedAlerts = data.alerts.map(a => ({
+                    id: a.id,
+                    type: a.ai_scene_type ? (a.ai_scene_type.charAt(0).toUpperCase() + a.ai_scene_type.slice(1)) : (a.level || 'Alert'),
+                    location: a.location || 'Unknown',
+                    time: new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    operator: a.operator_name || 'System',
+                    status: a.status.charAt(0).toUpperCase() + a.status.slice(1),
+                    level: a.level
+                }));
+                setAlerts(mappedAlerts);
+            }
+        } catch (error) {
+            console.error('Error fetching alerts:', error);
+        }
+    };
+
     useEffect(() => {
-        const interval = setInterval(() => {
+        const fetchMaintenanceMode = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/settings/maintenance`);
+                const data = await response.json();
+                setMaintenanceMode(data.maintenance_mode);
+            } catch (error) {
+                console.error('Error fetching maintenance mode:', error);
+            }
+        };
+
+        fetchMaintenanceMode();
+        fetchAlerts(); // Initial fetch
+
+        const metricsInterval = setInterval(() => {
             setSystemMetrics(prev => ({
                 cpu: Math.min(100, Math.max(0, prev.cpu + (Math.random() * 4 - 2))),
                 gpu: Math.min(100, Math.max(0, prev.gpu + (Math.random() * 2 - 1))),
@@ -36,9 +82,32 @@ const AdminDashboard = () => {
                 latency: Math.min(500, Math.max(20, prev.latency + Math.floor(Math.random() * 10 - 5)))
             }));
         }, 2000);
-        return () => clearInterval(interval);
+
+        const alertsInterval = setInterval(fetchAlerts, 5000); // Polling every 5 seconds for "dynamic" feel
+
+        return () => {
+            clearInterval(metricsInterval);
+            clearInterval(alertsInterval);
+        };
     }, []);
 
+    const toggleMaintenanceMode = async (enabled) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/settings/maintenance`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: enabled.toString() })
+            });
+            const data = await response.json();
+            setMaintenanceMode(data.maintenance_mode);
+            showToast(`Maintenance Mode ${data.maintenance_mode ? 'Activated' : 'Deactivated'}`, data.maintenance_mode ? 'warning' : 'success');
+        } catch (error) {
+            console.error('Error updating maintenance mode:', error);
+            showToast('Failed to update maintenance mode', 'error');
+        }
+    };
+
+    const { showToast } = useNotifications();
     const [openAddOp, setOpenAddOp] = useState(false);
     const [newOp, setNewOp] = useState({
         id: `OP-${Math.floor(Math.random() * 9000) + 1000}`,
@@ -47,16 +116,14 @@ const AdminDashboard = () => {
         securityKey: ''
     });
     const [isExporting, setIsExporting] = useState(false);
-    const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
     const [addOpError, setAddOpError] = useState({ name: false, securityKey: false });
 
-    const handleExportReport = () => {
-        setIsExporting(true);
-        setTimeout(() => {
-            setIsExporting(false);
-            setNotification({ open: true, message: 'Global Security Report exported successfully!', severity: 'success' });
-        }, 2000);
-    };
+    // Resolve Dialog State
+    const [openResolve, setOpenResolve] = useState(false);
+    const [selectedAlert, setSelectedAlert] = useState(null);
+    const [resolutionType, setResolutionType] = useState('');
+    const [resolutionNotes, setResolutionNotes] = useState('');
+
 
     const handleAddOperator = () => {
         const errors = {
@@ -66,7 +133,7 @@ const AdminDashboard = () => {
         setAddOpError(errors);
 
         if (errors.name || errors.securityKey) {
-            setNotification({ open: true, message: 'Please fill in all required fields.', severity: 'error' });
+            showToast('Please fill in all required fields.', 'error');
             return;
         }
 
@@ -79,7 +146,7 @@ const AdminDashboard = () => {
             securityKey: ''
         });
         setAddOpError({ name: false, securityKey: false });
-        setNotification({ open: true, message: 'New operator added to roster.', severity: 'success' });
+        showToast('New operator added to roster.', 'success');
     };
 
     const fetchAuditHistory = async () => {
@@ -101,12 +168,142 @@ const AdminDashboard = () => {
         }
     }, [tab]);
 
-    const handleAcknowledge = (id) => {
-        setAlerts(alerts.map(a => a.id === id ? { ...a, status: 'Acknowledged' } : a));
+    const handleExportGlobalReport = async () => {
+        setIsExporting(true);
+        showToast('Generating Global Report...', 'info');
+        try {
+            // 1. Fetch all data
+            const [recentRes, historyRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/alerts/recent`),
+                fetch(`${API_BASE_URL}/alerts/history`)
+            ]);
+
+            const recentData = await recentRes.json();
+            const historyData = await historyRes.json();
+
+            const allAlerts = [
+                ...(recentData.alerts || []),
+                ...(historyData.alerts || [])
+            ];
+
+            if (allAlerts.length === 0) {
+                showToast('No alerts found to export', 'warning');
+                return;
+            }
+
+            // 2. Initialize PDF
+            const doc = new jsPDF();
+            const timestamp = new Date().toLocaleString();
+
+            // 3. Add Header
+            doc.setFontSize(22);
+            doc.setTextColor(40, 40, 40);
+            doc.text("AURORA SENTINEL - GLOBAL SECURITY REPORT", 14, 22);
+
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Generated on: ${timestamp}`, 14, 30);
+            doc.text(`System Status: ${maintenanceMode ? 'MAINTENANCE MODE ACTIVE' : 'OPERATIONAL'}`, 14, 35);
+
+            // 4. Add Summary Statistics
+            doc.setFontSize(14);
+            doc.setTextColor(0, 0, 0);
+            doc.text("Summary Statistics", 14, 45);
+
+            const total = allAlerts.length;
+            const critical = allAlerts.filter(a => a.level === 'CRITICAL').length;
+            const pending = allAlerts.filter(a => a.status === 'pending').length;
+            const resolved = allAlerts.filter(a => a.status === 'resolved').length;
+
+            autoTable(doc, {
+                startY: 50,
+                head: [['Total Alerts', 'Critical Threats', 'Pending Tasks', 'Resolved/Archived']],
+                body: [[total, critical, pending, resolved]],
+                theme: 'striped',
+                headStyles: { fillColor: [44, 62, 80] }
+            });
+
+            // 5. Add Detailed Alert Table
+            doc.text("Alert Details", 14, doc.lastAutoTable.finalY + 15);
+
+            const tableData = allAlerts.map(a => [
+                a.id,
+                new Date(a.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
+                (a.ai_scene_type || a.level).toUpperCase(),
+                a.status.toUpperCase(),
+                a.operator_name || 'System',
+                a.location,
+                a.ai_explanation || a.resolution_notes || 'No detailed description available.'
+            ]);
+
+            autoTable(doc, {
+                startY: doc.lastAutoTable.finalY + 20,
+                head: [['ID', 'Timestamp', 'Type', 'Status', 'Operator', 'Location', 'Description Details']],
+                body: tableData,
+                columnStyles: {
+                    6: { cellWidth: 60 } // Description column width
+                },
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [44, 62, 80] }
+            });
+
+            // 6. Save PDF
+            doc.save(`Sentinel_Global_Report_${new Date().getTime()}.pdf`);
+            showToast('Global Report downloaded successfully', 'success');
+            
+        } catch (error) {
+            console.error('Export Error:', error);
+            showToast('Failed to generate report', 'error');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
-    const handleResolve = (id) => {
-        setAlerts(alerts.map(a => a.id === id ? { ...a, status: 'Resolved' } : a));
+    const handleAcknowledge = async (id) => {
+        try {
+            await fetch(`${API_BASE_URL}/alerts/${id}/acknowledge`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ operator_name: user?.name || 'Admin' })
+            });
+            fetchAlerts();
+            showToast('Alert acknowledged', 'success');
+        } catch (error) {
+            console.error('Error acknowledging alert:', error);
+            showToast('Failed to acknowledge alert', 'error');
+        }
+    };
+
+    const handleResolve = async (id) => {
+        const alert = alerts.find(a => a.id === id);
+        if (alert) {
+            setSelectedAlert(alert);
+            setResolutionType('');
+            setResolutionNotes('');
+            setOpenResolve(true);
+        }
+    };
+
+    const submitResolution = async () => {
+        if (!selectedAlert || !resolutionType) return;
+        try {
+            await fetch(`${API_BASE_URL}/alerts/${selectedAlert.id}/resolve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    resolution_type: resolutionType,
+                    resolution_notes: resolutionNotes || 'Resolved from Admin Dashboard',
+                    operator_name: user?.name || 'Admin'
+                })
+            });
+            setOpenResolve(false);
+            fetchAlerts();
+            fetchAuditHistory(); // Refresh logs immediately
+            showToast('Alert resolved and archived', 'success');
+        } catch (error) {
+            console.error('Error resolving alert:', error);
+            showToast('Failed to resolve alert', 'error');
+        }
     };
 
     const AuditLogsTable = () => (
@@ -129,7 +326,13 @@ const AdminDashboard = () => {
                         ) : auditHistory.map((row, i) => (
                             <TableRow key={i} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                                 <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                                    {new Date(row.resolved_at).toLocaleTimeString()}
+                                    {row.resolved_at ? new Date(row.resolved_at).toLocaleString([], { 
+                                        hour: '2-digit', 
+                                        minute: '2-digit', 
+                                        second: '2-digit',
+                                        day: '2-digit',
+                                        month: 'short'
+                                    }) : 'Unknown'}
                                 </TableCell>
                                 <TableCell>
                                     <Chip
@@ -199,7 +402,7 @@ const AdminDashboard = () => {
                     variant="contained"
                     startIcon={isExporting ? <CircularProgress size={18} color="inherit" /> : <FileText size={18} />}
                     disabled={isExporting}
-                    onClick={handleExportReport}
+                    onClick={handleExportGlobalReport}
                     sx={{ borderRadius: 3, px: 4, py: 1.5, fontWeight: 800 }}
                 >
                     {isExporting ? 'Exporting...' : 'Export Global Report'}
@@ -217,7 +420,7 @@ const AdminDashboard = () => {
                         '& .Mui-selected': { color: theme.palette.primary.main }
                     }}
                 >
-                    <Tab icon={<Bell size={18} />} label="Alert Queue" />
+                    <Tab icon={<AlertTriangle size={18} />} label="Alert Queue" />
                     <Tab icon={<Users size={18} />} label="Operators" />
                     <Tab icon={<FileText size={18} />} label="Audit Logs" />
                     <Tab icon={<Settings size={18} />} label="System Pulse" />
@@ -236,7 +439,7 @@ const AdminDashboard = () => {
                                     <Paper key={alert.id} variant="outlined" sx={{ p: 2, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                                             <Box sx={{ p: 1.5, borderRadius: 3, bgcolor: alert.status === 'Resolved' ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1) }}>
-                                                <AlertCircle size={24} color={alert.status === 'Resolved' ? theme.palette.success.main : theme.palette.error.main} />
+                                                <AlertTriangle size={24} color={alert.status === 'Resolved' ? theme.palette.success.main : theme.palette.error.main} />
                                             </Box>
                                             <Box>
                                                 <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{alert.type} - {alert.location}</Typography>
@@ -247,7 +450,7 @@ const AdminDashboard = () => {
                                         </Box>
                                         <Box sx={{ display: 'flex', gap: 1.5 }}>
                                             {alert.status === 'Pending' && (
-                                                <Button variant="outlined" color="primary" onClick={() => handleAcknowledge(alert.id)} startIcon={<CheckCircle size={16} />} sx={{ borderRadius: 2, fontWeight: 700 }}>Acknowledge</Button>
+                                                <Button variant="outlined" color="primary" onClick={() => handleAcknowledge(alert.id)} startIcon={<Check size={16} />} sx={{ borderRadius: 2, fontWeight: 700 }}>Acknowledge</Button>
                                             )}
                                             {alert.status !== 'Resolved' && (
                                                 <Button variant="contained" color="success" onClick={() => handleResolve(alert.id)} sx={{ borderRadius: 2, fontWeight: 700 }}>Resolve</Button>
@@ -255,7 +458,7 @@ const AdminDashboard = () => {
                                             {alert.status === 'Resolved' && (
                                                 <Chip label="Finalized" color="success" sx={{ fontWeight: 800 }} />
                                             )}
-                                            <IconButton><XCircle size={20} color={theme.palette.text.secondary} /></IconButton>
+                                            <IconButton><X size={20} color={theme.palette.text.secondary} /></IconButton>
                                         </Box>
                                     </Paper>
                                 ))}
@@ -327,7 +530,7 @@ const AdminDashboard = () => {
                                             <Lock size={18} /> Master Overrides
                                         </Typography>
                                         <FormControlLabel
-                                            control={<Switch checked={maintenanceMode} onChange={(e) => setMaintenanceMode(e.target.checked)} color="warning" />}
+                                            control={<Switch checked={maintenanceMode} onChange={(e) => toggleMaintenanceMode(e.target.checked)} color="warning" />}
                                             label={<Box><Typography variant="body1" sx={{ fontWeight: 700 }}>Maintenance Mode</Typography><Typography variant="caption" color="text.secondary">Locks all operator actions and shows maintenance screen</Typography></Box>}
                                         />
                                         <FormControlLabel control={<Switch defaultChecked />} label={<Box><Typography variant="body1" sx={{ fontWeight: 700 }}>Global AI Thresholding</Typography><Typography variant="caption" color="text.secondary">Auto-adjust sensitivity based on system load</Typography></Box>} />
@@ -346,6 +549,67 @@ const AdminDashboard = () => {
                     )}
                 </Box>
             </Paper>
+
+
+            {/* Resolve Alert Dialog */}
+            <Dialog
+                open={openResolve}
+                onClose={() => setOpenResolve(false)}
+                TransitionComponent={Transition}
+                fullWidth
+                maxWidth="sm"
+                PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, fontWeight: 900 }}>
+                    <Shield color={theme.palette.primary.main} />
+                    Resolve Alert #{selectedAlert?.id}
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
+                        <Box>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, color: theme.palette.text.secondary }}>RESOLUTION OUTCOME</Typography>
+                            <TextField
+                                select
+                                fullWidth
+                                value={resolutionType}
+                                onChange={(e) => setResolutionType(e.target.value)}
+                                variant="outlined"
+                                placeholder="Select outcome..."
+                            >
+                                {RESOLUTION_TYPES.map((option) => (
+                                    <MenuItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        </Box>
+                        <Box>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, color: theme.palette.text.secondary }}>INCIDENT NOTES</Typography>
+                            <TextField
+                                fullWidth
+                                multiline
+                                rows={4}
+                                value={resolutionNotes}
+                                onChange={(e) => setResolutionNotes(e.target.value)}
+                                placeholder="Enter detailed notes about the resolution action taken..."
+                                variant="outlined"
+                            />
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button onClick={() => setOpenResolve(false)} sx={{ fontWeight: 700, color: theme.palette.text.secondary }}>Cancel</Button>
+                    <Button 
+                        onClick={submitResolution} 
+                        variant="contained" 
+                        color="success" 
+                        disabled={!resolutionType}
+                        sx={{ borderRadius: 2, px: 3, fontWeight: 800 }}
+                    >
+                        Mark Active & Archive
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Add Operator Dialog */}
             <Dialog open={openAddOp} onClose={() => setOpenAddOp(false)} PaperProps={{ sx: { borderRadius: 4, p: 1 } }}>
@@ -402,17 +666,6 @@ const AdminDashboard = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Notification Snackbar */}
-            <Snackbar
-                open={notification.open}
-                autoHideDuration={4000}
-                onClose={() => setNotification({ ...notification, open: false })}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            >
-                <Alert severity={notification.severity} sx={{ borderRadius: 3, fontWeight: 700 }}>
-                    {notification.message}
-                </Alert>
-            </Snackbar>
         </Box>
     );
 };

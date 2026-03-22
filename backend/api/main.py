@@ -4,7 +4,7 @@ load_dotenv() # MUST BE FIRST
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db.database import engine, Base
-from backend.api.routers import alerts, analytics, video, stream, archive, stream_vlm, intelligence
+from backend.api.routers import alerts, analytics, video, stream, archive, stream_vlm, intelligence, settings
 from backend.services.ml_service import ml_service
 import os
 import shutil
@@ -75,6 +75,8 @@ print("Including archive router...")
 app.include_router(archive.router, prefix="/archive", tags=["Archive"])
 print("Including intelligence router...")
 app.include_router(intelligence.router, prefix="/intelligence", tags=["Intelligence"]) 
+print("Including settings router...")
+app.include_router(settings.router, prefix="/settings", tags=["Settings"])
 print("All routers included.")
 
 # Serve Static Files (Frontend)

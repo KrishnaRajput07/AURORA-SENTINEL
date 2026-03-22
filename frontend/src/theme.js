@@ -71,6 +71,14 @@ const theme = createTheme({
                 body: {
                     backgroundColor: '#E8E2D8',
                 },
+                '*::selection': {
+                    backgroundColor: 'rgba(111, 143, 114, 0.4)',
+                    color: '#000000 !important',
+                },
+                '*::-moz-selection': {
+                    backgroundColor: 'rgba(111, 143, 114, 0.4)',
+                    color: '#000000 !important',
+                },
             },
         },
         MuiPaper: {

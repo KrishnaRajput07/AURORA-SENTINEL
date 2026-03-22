@@ -34,3 +34,8 @@ class Alert(Base):
     # Resolution Fields
     resolution_type = Column(String, nullable=True) # False Positive, Threat Neutralized, etc.
     resolution_notes = Column(String, nullable=True)
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+    
+    key = Column(String, primary_key=True, index=True)
+    value = Column(String)  # Stored as string, can be parsed as JSON if needed

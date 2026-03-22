@@ -83,9 +83,9 @@ async def resolve_alert(alert_id: int, req: ResolveRequest, db: Session = Depend
 def alert_to_dict(alert: Alert):
     try:
         # Robust date handling
-        ts_iso = alert.timestamp.isoformat() if alert.timestamp else datetime.utcnow().isoformat()
-        ack_iso = alert.acknowledged_at.isoformat() if alert.acknowledged_at else None
-        res_iso = alert.resolved_at.isoformat() if alert.resolved_at else None
+        ts_iso = (alert.timestamp.isoformat() + "Z") if alert.timestamp else (datetime.utcnow().isoformat() + "Z")
+        ack_iso = (alert.acknowledged_at.isoformat() + "Z") if alert.acknowledged_at else None
+        res_iso = (alert.resolved_at.isoformat() + "Z") if alert.resolved_at else None
 
         data = {
             "id": alert.id,
@@ -100,7 +100,15 @@ def alert_to_dict(alert: Alert):
             "resolution_notes": alert.resolution_notes,
             "acknowledged_at": ack_iso,
             "resolved_at": res_iso,
-            "video_clip_path": alert.video_clip_path
+            "video_clip_path": alert.video_clip_path,
+            
+            # Enhanced fields
+            "ai_scene_type": getattr(alert, 'ai_scene_type', None),
+            "ml_score": getattr(alert, 'ml_score', None),
+            "ai_score": getattr(alert, 'ai_score', None),
+            "final_score": getattr(alert, 'final_score', None),
+            "detection_source": getattr(alert, 'detection_source', None),
+            "ai_explanation": getattr(alert, 'ai_explanation', None)
         }
         
         # Flatten risk_factors for frontend compatibility

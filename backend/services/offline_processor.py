@@ -24,6 +24,7 @@ class OfflineProcessor:
         self.ensure_metadata_file()
 
     def ensure_metadata_file(self):
+        os.makedirs(os.path.dirname(self.metadata_file), exist_ok=True)
         if not os.path.exists(self.metadata_file):
             with open(self.metadata_file, 'w') as f:
                 json.dump([], f)
