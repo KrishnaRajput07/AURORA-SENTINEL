@@ -76,7 +76,7 @@ class RiskScoringEngine:
         
         # ENHANCED FIGHT DETECTION THRESHOLDS
         self.thresholds = {
-            'loitering_time': 4.0,      # Reduced from 5.0
+            'loitering_time': 15.0,     # Increased to prevent false positives
             'unattended_time': 8.0,     # Reduced from 10.0
             'crowd_multiplier': 1.2,    # Reduced from 1.5
             'strike_velocity': 0.40,    # 40% of body height per frame (enhanced for fight detection)
@@ -130,7 +130,7 @@ class RiskScoringEngine:
             'aggression_raised_arms': 0.7,
             'aggression_strike': 0.5,
             'aggression_fighting_stance': 0.6,
-            'loitering_time': 4.0,
+            'loitering_time': 15.0,
             'unattended_time': 8.0,
             'crowd_multiplier': 1.2,
             'proximity_alert': 0.45,
@@ -299,10 +299,10 @@ class RiskScoringEngine:
         
         # WEAPON ESCALATION: 
         weapon_conf = factors.get('weapon_detection', 0) or 0
-        if weapon_conf > 0.5: 
+        if weapon_conf > 0.70: # Hardened to prevent false COCO triggers
             raw_score = max(raw_score, 0.85) # Immediate Serious Alert
             suppression_factor = 1.0 
-        elif weapon_conf > 0.35:
+        elif weapon_conf > 0.50:
             raw_score = max(raw_score, 0.5)
             suppression_factor = max(suppression_factor, 0.9)
         
@@ -401,7 +401,7 @@ class RiskScoringEngine:
                 if obj.get('class') in weapon_types:
                     # For standard objects, we require higher confidence or contextual support
                     obj_conf = obj.get('confidence', 0)
-                    if obj_conf > 0.5:
+                    if obj_conf > 0.65: # Hardened: Ignore bananas (~40-50% knife/gun conf)
                         max_conf = max(max_conf, obj_conf * 0.8) # Weight slightly lower than specialized models
                     
         return max_conf
@@ -745,8 +745,8 @@ class RiskScoringEngine:
             end_pos = np.array(history[-1][0])
             displacement = np.linalg.norm(end_pos - start_pos)
             
-            # Scale-invariant movement check: If moved < 25% of height over the window
-            if displacement < (height * 0.25):
+            # Scale-invariant movement check: If moved < 50% of height over the window
+            if displacement < (height * 0.5):
                 loiter_count += 1
                 
         if p_count == 0: return 0.0

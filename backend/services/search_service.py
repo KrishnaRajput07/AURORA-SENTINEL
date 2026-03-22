@@ -39,8 +39,10 @@ class SearchService:
         if not self._vector_enabled:
             return None
         if self._model is None:
-            print("Loading SentenceTransformer model (all-MiniLM-L6-v2) on CPU...")
-            self._model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+            import torch
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            print(f"Loading SentenceTransformer model (all-MiniLM-L6-v2) on {device.upper()}...")
+            self._model = SentenceTransformer('all-MiniLM-L6-v2', device=device)
             print("Model loaded successfully.")
         return self._model
 

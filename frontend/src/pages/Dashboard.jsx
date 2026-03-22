@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Grid, Typography, Paper, Box, useTheme, Chip, IconButton } from '@mui/material';
+import { Grid, Typography, Paper, Box, useTheme, Chip, IconButton, alpha } from '@mui/material';
 import RiskHeatmap from '../components/RiskHeatmap';
 import AlertQueue from '../components/AlertQueue';
 import LiveFeed from '../components/LiveFeed';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import { motion, AnimatePresence } from 'framer-motion';
+import LayoutGrid from '../components/LayoutGrid';
 import { Activity, Shield, AlertTriangle, MoreHorizontal } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { API_BASE_URL } from '../config';
+import { threatEventEmitter } from '../components/LiveFeed';
 
 const Dashboard = () => {
     const { user } = useAuth();
@@ -72,99 +74,87 @@ const Dashboard = () => {
                 </Box>
             </Grid>
 
-            {/* Top Row: Map and Live Feed */}
-            <Grid item xs={12} lg={8}>
-                <motion.div variants={cardVariants} initial="hidden" animate="visible">
-                    <Paper sx={{
-                        p: 0,
-                        height: 400,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        overflow: 'hidden'
-                    }}>
-                        {/* Clean Header */}
-                        <Box sx={{
-                            py: 2,
-                            px: 3,
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                        }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                <Box sx={{ p: 1, bgcolor: '#F0FDF4', borderRadius: '50%' }}> {/* Soft green bg */}
-                                    <Activity size={20} color={theme.palette.primary.main} />
-                                </Box>
-                                <Typography variant="h6" sx={{ fontSize: '1rem', color: theme.palette.text.primary }}>
-                                    Live Activity Map
-                                </Typography>
-                            </Box>
-                            <Chip label="Active" size="small" color="success" sx={{ height: 24, fontSize: '0.75rem' }} />
-                        </Box>
-
-                        <Box sx={{ flexGrow: 1, position: 'relative' }}>
-                            <RiskHeatmap alerts={alerts} />
-                        </Box>
-                    </Paper>
-                </motion.div>
-            </Grid>
-
-            <Grid item xs={12} lg={4}>
-                <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
-                    <Paper sx={{ p: 0, height: 400, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        <Box sx={{
-                            py: 1,
-                            px: 2.5,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1.25,
-                        }}>
-                            <Box sx={{ p: 0.75, bgcolor: '#FFF7ED', borderRadius: '50%' }}> {/* Soft orange bg */}
-                                <Shield size={16} color={theme.palette.secondary.main} />
-                            </Box>
-                            <Typography variant="h6" sx={{ fontSize: '0.9rem', color: theme.palette.text.primary, fontWeight: 700 }}>
-                                Camera Feed
-                            </Typography>
-                        </Box>
-                        <Box sx={{ flexGrow: 1, bgcolor: '#000', position: 'relative' }}>
-                            <LiveFeed />
-                        </Box>
-                    </Paper>
-                </motion.div>
-            </Grid>
-
-            {/* Middle Row: Analytics */}
+            {/* Animated Aceternity Layout Grid */}
             <Grid item xs={12}>
-                <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.3 }}>
-                    <AnalyticsDashboard data={riskData} />
-                </motion.div>
-            </Grid>
-
-            {/* Bottom Row: Alert Queue */}
-            <Grid item xs={12}>
-                <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.4 }}>
-                    <Paper sx={{ p: 0, overflow: 'hidden' }}>
-                        <Box sx={{
-                            p: 3,
-                            borderBottom: `1px solid ${theme.palette.divider}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between'
-                        }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                <Box sx={{ p: 1, bgcolor: '#FEF2F2', borderRadius: '50%' }}> {/* Soft red bg */}
-                                    <AlertTriangle size={20} color={theme.palette.error.main} />
+                <LayoutGrid 
+                    columns={3}
+                    cards={[
+                        {
+                            id: 'heatmap',
+                            colSpan: { xs: 'span 1', md: 'span 2' },
+                            content: (
+                                <Paper sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', pointerEvents: 'auto' }}>
+                                    <Box sx={{ py: 2, px: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                            <Box sx={{ p: 1, bgcolor: '#F0FDF4', borderRadius: '50%' }}>
+                                                <Activity size={20} color={theme.palette.primary.main} />
+                                            </Box>
+                                            <Typography variant="h6" sx={{ fontSize: '1rem', color: theme.palette.text.primary, fontWeight: 700 }}>
+                                                Live Activity Map
+                                            </Typography>
+                                        </Box>
+                                        <Chip label="Active" size="small" color="success" sx={{ height: 24, fontSize: '0.75rem' }} />
+                                    </Box>
+                                    <Box sx={{ flexGrow: 1, position: 'relative' }}>
+                                        <RiskHeatmap alerts={alerts} />
+                                    </Box>
+                                </Paper>
+                            )
+                        },
+                        {
+                            id: 'camera',
+                            colSpan: { xs: 'span 1', md: 'span 1' },
+                            content: ({ isSelected }) => (
+                                <Paper sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', pointerEvents: 'auto' }}>
+                                    <Box sx={{ py: 1, px: 2.5, display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                                        <Box sx={{ p: 0.75, bgcolor: '#FFF7ED', borderRadius: '50%' }}>
+                                            <Shield size={16} color={theme.palette.secondary.main} />
+                                        </Box>
+                                        <Typography variant="h6" sx={{ fontSize: '0.9rem', color: theme.palette.text.primary, fontWeight: 700 }}>
+                                            Camera Feed
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ flexGrow: 1, bgcolor: '#000', position: 'relative' }}>
+                                        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                                            <LiveFeed isExpanded={isSelected} />
+                                        </Box>
+                                    </Box>
+                                </Paper>
+                            )
+                        },
+                        {
+                            id: 'analytics',
+                            colSpan: { xs: 'span 1', md: 'span 3' },
+                            content: (
+                                <Box sx={{ height: '100%', pointerEvents: 'auto' }}>
+                                    <AnalyticsDashboard data={riskData} />
                                 </Box>
-                                <Typography variant="h6" sx={{ fontSize: '1rem', color: theme.palette.text.primary }}>
-                                    Recent Alerts
-                                </Typography>
-                            </Box>
-                            <IconButton size="small"><MoreHorizontal size={20} /></IconButton>
-                        </Box>
-                        <Box sx={{ p: 0 }}>
-                            <AlertQueue alerts={alerts} onAcknowledge={fetchAlerts} />
-                        </Box>
-                    </Paper>
-                </motion.div>
+                            )
+                        },
+                        {
+                            id: 'alerts',
+                            colSpan: { xs: 'span 1', md: 'span 3' },
+                            content: (
+                                <Paper sx={{ p: 0, height: '100%', overflow: 'hidden', pointerEvents: 'auto', display: 'flex', flexDirection: 'column' }}>
+                                    <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                            <Box sx={{ p: 1, bgcolor: '#FEF2F2', borderRadius: '50%' }}>
+                                                <AlertTriangle size={20} color={theme.palette.error.main} />
+                                            </Box>
+                                            <Typography variant="h6" sx={{ fontSize: '1rem', color: theme.palette.text.primary, fontWeight: 700 }}>
+                                                Recent Alerts
+                                            </Typography>
+                                        </Box>
+                                        <IconButton size="small"><MoreHorizontal size={20} /></IconButton>
+                                    </Box>
+                                    <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+                                        <AlertQueue alerts={alerts} onAcknowledge={fetchAlerts} />
+                                    </Box>
+                                </Paper>
+                            )
+                        }
+                    ]} 
+                />
             </Grid>
         </Grid>
     );

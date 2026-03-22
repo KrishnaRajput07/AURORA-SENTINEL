@@ -27,6 +27,7 @@ app.add_middleware(
 )
 
 # Serve recorded videos
+os.makedirs("storage/recordings", exist_ok=True)
 app.mount("/recordings", StaticFiles(directory="storage/recordings"), name="recordings")
 
 from fastapi.responses import JSONResponse
@@ -90,7 +91,7 @@ if os.path.exists("frontend/build"):
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         # Prevent intercepting API routes
-        if full_path.startswith(("alerts", "analytics", "ws", "vlm", "process", "archive", "intelligence", "health")):
+        if full_path.split('/')[0] in ["alerts", "analytics", "ws", "vlm", "process", "archive", "intelligence", "health", "docs", "openapi.json"]:
             return JSONResponse(status_code=404, content={"detail": "Not Found"})
         return FileResponse("frontend/build/index.html")
 else:

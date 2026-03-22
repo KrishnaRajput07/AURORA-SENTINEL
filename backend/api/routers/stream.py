@@ -204,6 +204,14 @@ async def websocket_live_feed(websocket: WebSocket):
             try:
                 # Only send full metadata every 3 frames to save bandwidth/CPU
                 if frame_count % 3 == 0 or alert is not None:
+                    active_threats = set()
+                    for w in detection.get('weapons', []):
+                        active_threats.add(w.get('sub_class', 'weapon'))
+                    for o in detection.get('objects', []):
+                        cls = o.get('class', '')
+                        if cls in ['knife', 'baseball bat', 'scissors', 'gun', 'fire']:
+                            active_threats.add(cls)
+
                     await websocket.send_json({
                         "risk_score": risk_score,
                         "risk_factors": risk_factors,
@@ -211,7 +219,8 @@ async def websocket_live_feed(websocket: WebSocket):
                         "detections": {
                             "person_count": len(detection.get('poses', [])),
                             "object_count": len(detection.get('objects', [])),
-                            "weapon_count": len(detection.get('weapons', []))
+                            "weapon_count": len(detection.get('weapons', [])),
+                            "active_threats": list(active_threats)
                         }
                     })
                 # Then the heavy frame data

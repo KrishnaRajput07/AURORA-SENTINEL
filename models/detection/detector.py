@@ -182,7 +182,7 @@ class UnifiedDetector:
                 # Also check for 'handgun' or 'pistol' specifically
                 is_valid_weapon = any(w in cls_name for w in ['gun', 'weapon', 'pistol', 'rifle', 'knife', 'machete'])
                 
-                if (is_valid_weapon or cls_id in [43, 34, 76]) and conf > 0.35:
+                if (is_valid_weapon or cls_id in [43, 34, 76]) and conf > 0.60:
                     weapons.append({
                         'class': 'weapon',
                         'sub_class': cls_name if cls_name != 'unknown' else 'unidentified_threat',

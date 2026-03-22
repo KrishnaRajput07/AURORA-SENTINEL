@@ -1,11 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Box, Typography, useTheme, alpha, MenuItem, Select, FormControl, Switch, FormControlLabel, Fade } from '@mui/material';
-import { User, Box as BoxIcon, RefreshCw, BrainCircuit } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User, Box as BoxIcon, RefreshCw, BrainCircuit, Shield, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { useSettings } from '../context/SettingsContext';
 import { WS_BASE_URL } from '../config';
 
-const LiveFeed = () => {
+// Global Event Emitter for high-frequency, low-latency UI updates without React layout thrashing
+export const threatEventEmitter = new EventTarget();
+
+const LiveFeed = ({ isExpanded }) => {
     const { addNotification } = useNotifications();
     const [metadata, setMetadata] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
@@ -104,10 +108,13 @@ const LiveFeed = () => {
                     const img = new Image();
                     img.onload = () => {
                         if (displayCanvasRef.current) {
-                            const ctx = displayCanvasRef.current.getContext('2d');
-                            displayCanvasRef.current.width = img.width;
-                            displayCanvasRef.current.height = img.height;
-                            ctx.drawImage(img, 0, 0);
+                            const canvas = displayCanvasRef.current;
+                            if (canvas.width !== img.width || canvas.height !== img.height) {
+                                canvas.width = img.width;
+                                canvas.height = img.height;
+                            }
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                         }
                         isWaitingRef.current = false;
                         URL.revokeObjectURL(img.src);
@@ -117,6 +124,11 @@ const LiveFeed = () => {
                     try {
                         const data = JSON.parse(event.data);
                         setMetadata(data);
+                        
+                        // Fire event so separate components (like HotThreatsCard) can listen without triggering a global re-render loop
+                        if (data?.detections?.active_threats) {
+                            threatEventEmitter.dispatchEvent(new CustomEvent('threatsUpdated', { detail: data.detections.active_threats }));
+                        }
                     } catch (e) { }
                 }
             };
@@ -134,8 +146,9 @@ const LiveFeed = () => {
     const lastAlertTimeRef = useRef(0);
 
     const animate = (time) => {
-        const frameInterval = performanceMode ? 50 : 33; // ~20fps or ~30fps
-        if (time - lastFrameTimeRef.current >= frameInterval) {
+        const frameInterval = performanceMode ? 50 : 0; // Run un-capped for max smoothness if not performanceMode
+        
+        if (!isWaitingRef.current && (time - lastFrameTimeRef.current >= frameInterval)) {
             captureAndSend();
             lastFrameTimeRef.current = time;
         }
@@ -156,17 +169,28 @@ const LiveFeed = () => {
             });
             lastAlertTimeRef.current = Date.now();
         }
-
+        
+        // Safety watchdog: Unlock if stuck for > 2 seconds
+        if (isWaitingRef.current && (time - lastFrameTimeRef.current > 2000)) {
+            isWaitingRef.current = false; 
+        }
         requestRef.current = requestAnimationFrame(animate);
     };
 
     const captureAndSend = () => {
+        // Relax readystate check (3 or 4 is fine for processing) and unlock if waiting!
         if (isWaitingRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-        if (!videoRef.current || videoRef.current.readyState !== 4) return;
+        if (!videoRef.current || videoRef.current.readyState < 2) return;
+
+        // Synchronously lock the queue before async operations to prevent frame spamming
+        isWaitingRef.current = true;
 
         const canvas = captureCanvasRef.current;
         const video = videoRef.current;
-        if (!canvas) return;
+        if (!canvas) {
+            isWaitingRef.current = false;
+            return;
+        }
 
         const ctx = canvas.getContext('2d');
         const width = performanceMode ? 320 : 640;
@@ -181,7 +205,9 @@ const LiveFeed = () => {
         canvas.toBlob((blob) => {
             if (blob && wsRef.current?.readyState === WebSocket.OPEN) {
                 wsRef.current.send(blob);
-                isWaitingRef.current = true;
+            } else {
+                // If it fails to send, unlock immediately
+                isWaitingRef.current = false;
             }
         }, 'image/jpeg', performanceMode ? 0.6 : 0.82);
     };
@@ -197,8 +223,10 @@ const LiveFeed = () => {
     };
 
     return (
-        <Box sx={{ position: 'relative', width: '100%', height: '100%', bgcolor: '#000', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <Box sx={{ height: 32, bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
+        <Box className="live-feed-root" sx={{ position: 'relative', width: '100%', flexGrow: 1, minHeight: '100%', bgcolor: '#000', display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+            {/* MAIN VIDEO FEED AREA */}
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+                <Box sx={{ height: 32, bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: isConnected ? theme.palette.success.main : theme.palette.error.main, boxShadow: isConnected ? `0 0 8px ${theme.palette.success.main}` : 'none' }} />
                     <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontWeight: 700 }}>
@@ -233,15 +261,103 @@ const LiveFeed = () => {
                 />
             </Box>
 
-            <Box sx={{ flexGrow: 1, position: 'relative', bgcolor: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Box sx={{ 
+                flexGrow: 1, 
+                position: 'relative', 
+                bgcolor: '#05050A', 
+                backgroundImage: `radial-gradient(circle at 10% 50%, ${alpha(getRiskColor(currentScore), 0.15)} 0%, transparent 60%), radial-gradient(circle at 90% 50%, ${alpha(getRiskColor(currentScore), 0.10)} 0%, transparent 60%)`,
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                overflow: 'hidden' 
+            }}>
                 <video ref={videoRef} hidden playsInline muted />
                 <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
-                <canvas ref={displayCanvasRef} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                <canvas ref={displayCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 1 }} />
+
+                {/* THREAT CONTEXT SIDE PANEL (Visible only when expanded) */}
+                <AnimatePresence>
+                    {isExpanded && (
+                        <motion.div
+                            initial={{ x: -300, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: -300, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                            style={{
+                                position: 'absolute',
+                                left: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: '320px',
+                                zIndex: 10,
+                                background: 'rgba(20, 20, 25, 0.25)',
+                                backdropFilter: 'blur(30px) saturate(200%)',
+                                WebkitBackdropFilter: 'blur(30px) saturate(200%)',
+                                borderRight: `1px solid rgba(255, 255, 255, 0.1)`,
+                                boxShadow: 'inset -2px 0 20px rgba(255, 255, 255, 0.02), 10px 0 40px rgba(0, 0, 0, 0.5)',
+                                padding: '24px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflowY: 'auto',
+                                pointerEvents: 'auto'
+                            }}
+                        >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                                <ShieldCheck size={24} color={getRiskColor(currentScore)} />
+                                <Typography variant="h6" sx={{ color: '#fff', fontWeight: 800, letterSpacing: '0.05em' }}>
+                                    THREAT ANALYSIS
+                                </Typography>
+                            </Box>
+
+                            <Box sx={{ textAlign: 'center', mb: 4, p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2, border: `1px solid ${alpha(getRiskColor(currentScore), 0.3)}` }}>
+                                <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>OVERALL RISK SCORE</Typography>
+                                <Typography variant="h2" sx={{ color: getRiskColor(currentScore), fontWeight: 900, fontFamily: 'monospace', textShadow: `0 0 20px ${alpha(getRiskColor(currentScore), 0.5)}` }}>
+                                    {Math.round(currentScore)}<span style={{ fontSize: '0.5em' }}>%</span>
+                                </Typography>
+                            </Box>
+
+                            <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, mb: 1, display: 'block' }}>ACTIVE RISK FACTORS</Typography>
+                            
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {metadata?.risk_factors && Object.entries(metadata.risk_factors).map(([factor, score]) => {
+                                    if (score <= 0.05) return null; // Hide insignificant factors
+                                    const percentage = Math.round(score * 100);
+                                    const formattedName = factor.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                                    
+                                    return (
+                                        <Box key={factor} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Typography variant="caption" sx={{ color: '#fff', fontWeight: 700 }}>{formattedName}</Typography>
+                                                <Typography variant="caption" sx={{ color: getRiskColor(percentage), fontFamily: 'monospace', fontWeight: 800 }}>{percentage}%</Typography>
+                                            </Box>
+                                            <Box sx={{ width: '100%', height: 6, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                                                <motion.div 
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${percentage}%` }}
+                                                    transition={{ duration: 0.5 }}
+                                                    style={{ height: '100%', backgroundColor: getRiskColor(percentage), borderRadius: 3 }}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    );
+                                })}
+                                {(!metadata?.risk_factors || Object.values(metadata.risk_factors).every(s => s <= 0.05)) && (
+                                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', textAlign: 'center', py: 2 }}>
+                                        No significant risk factors detected at this moment.
+                                    </Typography>
+                                )}
+                            </Box>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {!isConnected && (
-                    <Box sx={{ position: 'absolute', textAlign: 'center', color: '#fff' }}>
+                    <Box sx={{ position: 'absolute', textAlign: 'center', color: '#fff', zIndex: 11 }}>
                         <RefreshCw size={24} className="spin" style={{ animation: 'spin 2s linear infinite' }} />
-                        <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>CONNECTING TO SERVER...</Typography>
+                        <Typography variant="caption" sx={{ mt: 1, display: 'block', fontWeight: 800 }}>CONNECTING TO SERVER...</Typography>
+                        <Typography variant="caption" sx={{ color: theme.palette.warning.main, display: 'block', mt: 0.5 }}>
+                            INITIALIZING AI MODELS ON GPU (MAY TAKE 15-30 SECONDS)
+                        </Typography>
                     </Box>
                 )}
 
@@ -276,12 +392,13 @@ const LiveFeed = () => {
                 </Fade>
 
 
-                <Box sx={{
+                <Box className="threat-indicator-overlay" sx={{
                     position: 'absolute',
-                    bottom: 36,
-                    left: 24,
-                    right: 24,
-                    height: 72,
+                    bottom: 16,
+                    left: 16,
+                    right: 16,
+                    minHeight: 64,
+                    zIndex: 100,
                     background: `linear-gradient(to top, ${alpha(getRiskColor(currentScore), 0.9)} 0%, ${alpha(getRiskColor(currentScore), 0.4)} 100%)`,
                     backdropFilter: 'blur(16px)',
                     borderRadius: 3,
@@ -289,24 +406,28 @@ const LiveFeed = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    px: 4,
+                    flexWrap: 'wrap',
+                    p: 2,
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
                 }}>
-                    <Box sx={{ display: 'flex', gap: 4 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}><User size={18} color="#fff" /><Typography variant="h6" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace' }}>{metadata?.detections?.person_count || 0}</Typography></Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}><BoxIcon size={18} color="#fff" /><Typography variant="h6" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace' }}>{metadata?.detections?.object_count || 0}</Typography></Box>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><User size={16} color="#fff" /><Typography variant="body1" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace' }}>{metadata?.detections?.person_count || 0}</Typography></Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><BoxIcon size={16} color="#fff" /><Typography variant="body1" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace' }}>{metadata?.detections?.object_count || 0}</Typography></Box>
                     </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
-                        <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 800 }}>STATUS</Typography>
-                        <Typography variant="h6" sx={{ color: '#fff', fontWeight: 900 }}>{(currentScore >= 75) ? 'CRITICAL BREACH' : (currentScore >= 50) ? 'ELEVATED RISK' : (currentScore >= 25) ? 'CAUTION REQ' : 'SECURE'}</Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', px: 2 }}>
+                        <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 800, fontSize: '0.65rem' }}>STATUS</Typography>
+                        <Typography variant="subtitle2" sx={{ color: '#fff', fontWeight: 900, fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{(currentScore >= 75) ? 'CRITICAL BREACH' : (currentScore >= 50) ? 'ELEVATED RISK' : (currentScore >= 25) ? 'CAUTION REQ' : 'SECURE'}</Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, bgcolor: 'rgba(255,255,255,0.15)', px: 2, py: 0.5, borderRadius: 2 }}>
-                        <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 900 }}>THREAT</Typography>
-                        <Typography variant="h3" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace', fontSize: '2rem' }}>{Math.round(currentScore)}%</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, bgcolor: 'rgba(255,255,255,0.15)', px: 1.5, py: 0.5, borderRadius: 2 }}>
+                        <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 900, fontSize: '0.7rem' }}>THREAT</Typography>
+                        <Typography variant="h5" sx={{ color: '#fff', fontWeight: 900, fontFamily: 'monospace' }}>{Math.round(currentScore)}%</Typography>
                     </Box>
                 </Box>
             </Box>
-            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            </Box>
+
+            {/* NEW: ACTIVE THREATS PANEL */}
+             <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
         </Box>
     );
 };

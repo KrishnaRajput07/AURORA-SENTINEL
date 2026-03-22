@@ -251,6 +251,11 @@ class NemotronProvider:
         self.available = False
         self.model = None
         self.processor = None
+        
+        if os.getenv("ENABLE_HEAVY_MODELS", "false").lower() != "true":
+            print("[VLM] Nemotron disabled (ENABLE_HEAVY_MODELS is not 'true')")
+            return
+            
         try:
             from transformers import AutoModel, AutoProcessor
             import torch
@@ -503,6 +508,11 @@ class ChartQAProvider(VLMProvider):
     def __init__(self):
         self.available = False
         self.pipe = None
+        
+        if os.getenv("ENABLE_HEAVY_MODELS", "false").lower() != "true":
+            print("[VLM] Pix2Struct disabled (ENABLE_HEAVY_MODELS is not 'true')")
+            return
+            
         try:
             from transformers import pipeline
             import torch
@@ -529,6 +539,11 @@ class Qwen2VLProvider(VLMProvider):
         self.available = False
         self.model = None
         self.processor = None
+        
+        if os.getenv("ENABLE_HEAVY_MODELS", "false").lower() != "true":
+            print("[VLM] Qwen2-VL disabled (ENABLE_HEAVY_MODELS is not 'true')")
+            return
+            
         try:
             from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
             from qwen_vl_utils import process_vision_info
