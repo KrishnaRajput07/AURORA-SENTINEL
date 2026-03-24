@@ -80,6 +80,8 @@ data/sample_videos/fightvideos/fight_0131.mpeg
 # ========================
 # Test / Temp Video Files
 # ========================
+*.mpeg
+*.mp4
 test_H264.mp4
 test_MJPG.mp4
 test_XVID.mp4

@@ -1,5 +1,5 @@
 #!/bin/bash
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")"
 echo -e "\e[36mStarting Aurora Sentinel...\e[0m"
 
 # Trap CTRL+C to kill all background jobs

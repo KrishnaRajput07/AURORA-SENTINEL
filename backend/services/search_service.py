@@ -39,8 +39,16 @@ class SearchService:
         if not self._vector_enabled:
             return None
         if self._model is None:
-            print("Loading SentenceTransformer model (all-MiniLM-L6-v2) on CPU...")
-            self._model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+            import sys, os
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            try:
+                import config
+                embed_model = getattr(config, "EMBEDDING_MODEL_ID", "all-MiniLM-L6-v2")
+            except ImportError:
+                embed_model = "all-MiniLM-L6-v2"
+                
+            print(f"Loading SentenceTransformer model ({embed_model}) on CPU...")
+            self._model = SentenceTransformer(embed_model, device='cpu')
             print("Model loaded successfully.")
         return self._model
 

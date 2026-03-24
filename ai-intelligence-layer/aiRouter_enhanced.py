@@ -24,6 +24,19 @@ _ollama_available = False
 _nemotron_provider = None
 _availability_tracker = get_tracker()
 
+# Load config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+    import config
+    PRIMARY_PROVIDER = getattr(config, "PRIMARY_VLM_PROVIDER", "qwen2vl_local")
+    OLLAMA_MODEL = getattr(config, "OLLAMA_CLOUD_MODEL", "qwen3-vl:235b-cloud")
+    QWEN2VL_MODEL = getattr(config, "QWEN2VL_MODEL_ID", "Qwen2-VL")
+except ImportError:
+    PRIMARY_PROVIDER = "qwen2vl_local"
+    OLLAMA_MODEL = "qwen3-vl:235b-cloud"
+    QWEN2VL_MODEL = "Qwen2-VL"
+
+
 def init_qwen2vl():
     """
     Initialize Qwen2-VL model.
@@ -298,7 +311,7 @@ DO NOT classify as "prank" or "drama" - any physical aggression is a real threat
         
         # Call Ollama
         response = ollama.chat(
-            model='llava:latest',  # Using llava:latest (7B model)
+            model=OLLAMA_MODEL,
             messages=[{
                 'role': 'user',
                 'content': prompt,
@@ -561,10 +574,37 @@ def analyze_image(image_data, ml_score, ml_factors, camera_id):
         result['latency_metrics'] = latency_metrics
         return result
     
-    # Try models in priority order
-    # 1. Qwen2-VL (GPU-accelerated, best accuracy)
-    # Requirement 7.1: Target 2 seconds on GPU
-    logger.info("Trying Qwen2-VL...")
+    # Try models based on config priority
+    if PRIMARY_PROVIDER == "ollama_cloud":
+        logger.info("Configured for Ollama Cloud primary, trying Ollama...")
+        # Check timeout
+        elapsed_time = time.time() - total_start_time
+        remaining_time = TOTAL_TIMEOUT - elapsed_time
+        result = None
+        
+        if remaining_time >= 0.5:
+            result = analyze_with_ollama(image, ml_score, ml_factors)
+            
+        if result:
+            ai_score_raw = result['aiScore']
+            final_score = int(0.3 * ml_score + 0.7 * result['aiScore'])
+            result['aiScore'] = final_score
+            result['weighted'] = True
+            result['ml_score'] = ml_score
+            result['ai_score_raw'] = ai_score_raw
+            latency_metrics['total_ms'] = int((time.time() - total_start_time) * 1000)
+            result['latency_metrics'] = latency_metrics
+            if error_details:
+                result['errors'] = error_details
+            if result['aiScore'] is None:
+                result['aiScore'] = ml_score
+            return result
+        else:
+            error_details['ollama'] = 'Primary Ollama failed, falling back to Local model'
+            logger.info(f"Primary ({OLLAMA_MODEL}) failed or timed out, falling back to Local ({QWEN2VL_MODEL})...")
+
+    # Secondary or Primary is Qwen2-VL
+    logger.info(f"Trying Local Provider ({QWEN2VL_MODEL})...")
     qwen_start_time = time.time()
     qwen_timeout = min(2.0, TOTAL_TIMEOUT - (time.time() - total_start_time))
     
@@ -572,7 +612,7 @@ def analyze_image(image_data, ml_score, ml_factors, camera_id):
     qwen_latency = time.time() - qwen_start_time
     latency_metrics['qwen2vl_ms'] = int(qwen_latency * 1000)
     
-    # Log Qwen2-VL latency (Requirement 7.5)
+    # Log Qwen2-VL latency
     logger.info(f"[Latency] Qwen2-VL: {latency_metrics['qwen2vl_ms']}ms (target: 2000ms)")
     if qwen_latency > 2.0:
         logger.warning(f"[Latency] Qwen2-VL exceeded target: {latency_metrics['qwen2vl_ms']}ms > 2000ms")
@@ -681,56 +721,59 @@ def analyze_image(image_data, ml_score, ml_factors, camera_id):
         
         return result
     else:
-        # Qwen2-VL failed - record error
+        # Qwen2-VL failed
         error_details['qwen2vl'] = 'Analysis failed or model unavailable'
-    
-    # 2. Ollama (Local fallback) - Requirement 6.1
-    # Check if we have time left (Requirement 7.4)
-    elapsed_time = time.time() - total_start_time
-    remaining_time = TOTAL_TIMEOUT - elapsed_time
-    
-    if remaining_time < 0.5:
-        # Not enough time for Ollama - use ML score (Requirement 7.4)
-        logger.warning(f"[Timeout] Insufficient time for Ollama ({remaining_time:.2f}s remaining), using ML score")
-        error_details['ollama'] = f'Skipped due to timeout (only {remaining_time:.2f}s remaining)'
-        latency_metrics['total_ms'] = int((time.time() - total_start_time) * 1000)
-        result = fallback_analysis(ml_score, ml_factors, error_details)
-        result['latency_metrics'] = latency_metrics
-        return result
-    
-    logger.info("Qwen2-VL failed, trying Ollama fallback...")
-    result = analyze_with_ollama(image, ml_score, ml_factors)
-    
-    if result:
-        # Ollama succeeded
-        # Always use weighted scoring: 30% ML + 70% AI
-        ai_score_raw = result['aiScore']
-        final_score = int(0.3 * ml_score + 0.7 * result['aiScore'])
-        result['aiScore'] = final_score
-        result['weighted'] = True
-        result['ml_score'] = ml_score
-        result['ai_score_raw'] = ai_score_raw
+
+    if PRIMARY_PROVIDER == "ollama_cloud":
+        pass
+    else:    
+        # 2. Ollama (Local fallback) - Requirement 6.1
+        # Check if we have time left (Requirement 7.4)
+        elapsed_time = time.time() - total_start_time
+        remaining_time = TOTAL_TIMEOUT - elapsed_time
         
-        # Calculate total latency (Requirement 7.5)
-        latency_metrics['total_ms'] = int((time.time() - total_start_time) * 1000)
-        result['latency_metrics'] = latency_metrics
+        if remaining_time < 0.5:
+            # Not enough time for Ollama - use ML score (Requirement 7.4)
+            logger.warning(f"[Timeout] Insufficient time for Ollama ({remaining_time:.2f}s remaining), using ML score")
+            error_details['ollama'] = f'Skipped due to timeout (only {remaining_time:.2f}s remaining)'
+            latency_metrics['total_ms'] = int((time.time() - total_start_time) * 1000)
+            result = fallback_analysis(ml_score, ml_factors, error_details)
+            result['latency_metrics'] = latency_metrics
+            return result
         
-        # Log total latency
-        logger.info(f"[Latency] Total analysis (with Ollama fallback): {latency_metrics['total_ms']}ms")
+        logger.info(f"Local ({QWEN2VL_MODEL}) failed, trying Cloud ({OLLAMA_MODEL}) fallback...")
+        result = analyze_with_ollama(image, ml_score, ml_factors)
         
-        # Include error details (Requirement 6.5)
-        if error_details:
-            result['errors'] = error_details
-        
-        # Ensure score is never null/undefined (Requirement 6.8)
-        if result['aiScore'] is None:
-            result['aiScore'] = ml_score
-            logger.warning("AI score was None, using ML score as fallback")
-        
-        return result
-    else:
-        # Ollama also failed - record error
-        error_details['ollama'] = 'Analysis failed or model unavailable'
+        if result:
+            # Ollama succeeded
+            # Always use weighted scoring: 30% ML + 70% AI
+            ai_score_raw = result['aiScore']
+            final_score = int(0.3 * ml_score + 0.7 * result['aiScore'])
+            result['aiScore'] = final_score
+            result['weighted'] = True
+            result['ml_score'] = ml_score
+            result['ai_score_raw'] = ai_score_raw
+            
+            # Calculate total latency (Requirement 7.5)
+            latency_metrics['total_ms'] = int((time.time() - total_start_time) * 1000)
+            result['latency_metrics'] = latency_metrics
+            
+            # Log total latency
+            logger.info(f"[Latency] Total analysis (with Ollama fallback): {latency_metrics['total_ms']}ms")
+            
+            # Include error details (Requirement 6.5)
+            if error_details:
+                result['errors'] = error_details
+            
+            # Ensure score is never null/undefined (Requirement 6.8)
+            if result['aiScore'] is None:
+                result['aiScore'] = ml_score
+                logger.warning("AI score was None, using ML score as fallback")
+            
+            return result
+        else:
+            # Ollama also failed - record error
+            error_details['ollama'] = 'Analysis failed or model unavailable'
     
     # 3. Both AI models failed - use ML score as final (Requirement 6.4)
     logger.warning("Both Qwen2-VL and Ollama failed, using ML score as final")

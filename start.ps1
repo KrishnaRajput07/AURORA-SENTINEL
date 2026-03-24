@@ -1,5 +1,5 @@
 # Aurora Sentinel Startup Script
-Set-Location "$PSScriptRoot\..\.."
+Set-Location "$PSScriptRoot"
 
 Write-Host "Starting Aurora Sentinel..." -ForegroundColor Cyan
 

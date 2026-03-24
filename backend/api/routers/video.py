@@ -49,11 +49,12 @@ async def process_video_file_task(video_path: str, context_params: dict = None):
     
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
-    out_name = f"proc_{os.path.basename(video_path)}"
+    base_name = os.path.basename(video_path)
+    name_without_ext = os.path.splitext(base_name)[0]
+    out_name = f"proc_{name_without_ext}.mp4"
     out_dir = os.path.abspath(os.getenv("PROCESSED_PATH", "storage/processed"))
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, out_name)
-    
     # Windows often fails H.264 (avc1) without an OpenH264 DLL.
     # Use mp4v for capture, then optionally transcode to H.264 via ffmpeg if available.
     # Prioritize browser-compatible codecs (H.264 / AVC1)

@@ -184,8 +184,18 @@ class HuggingFaceProvider(VLMProvider):
             return f"Error: {e}"
 
 class OllamaProvider(VLMProvider):
-    def __init__(self, model_name="llava"):
-        self.model_name = model_name
+    def __init__(self, model_name=None):
+        import sys, os
+        # Add root directory to path to support config.py import
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        try:
+            import config
+            self.model_name = getattr(config, "OLLAMA_CLOUD_MODEL", "qwen3-vl:235b-cloud")
+        except ImportError:
+            self.model_name = "qwen3-vl:235b-cloud"
+            
+        if model_name:
+            self.model_name = model_name
 
     def analyze(self, image, prompt):
         if ollama is None:
@@ -254,15 +264,23 @@ class NemotronProvider:
         try:
             from transformers import AutoModel, AutoProcessor
             import torch
-            print("[VLM] Loading Nemotron (nvidia/nemotron-colembed-vl-4b-v2)...")
+            import sys, os
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            try:
+                import config
+                model_id = getattr(config, "NEMOTRON_MODEL_ID", "nvidia/nemotron-colembed-vl-4b-v2")
+            except ImportError:
+                model_id = "nvidia/nemotron-colembed-vl-4b-v2"
+                
+            print(f"[VLM] Loading Nemotron ({model_id})...")
             self.model = AutoModel.from_pretrained(
-                "nvidia/nemotron-colembed-vl-4b-v2", 
+                model_id, 
                 trust_remote_code=True, 
                 torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                 device_map="auto" if torch.cuda.is_available() else None
             )
             self.processor = AutoProcessor.from_pretrained(
-                "nvidia/nemotron-colembed-vl-4b-v2", 
+                model_id, 
                 trust_remote_code=True
             )
             self.available = True
@@ -506,10 +524,18 @@ class ChartQAProvider(VLMProvider):
         try:
             from transformers import pipeline
             import torch
-            print("[VLM] Loading Pix2Struct (google/pix2struct-chartqa-base)...")
+            import sys, os
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            try:
+                import config
+                model_id = getattr(config, "PIX2STRUCT_MODEL_ID", "google/pix2struct-chartqa-base")
+            except ImportError:
+                model_id = "google/pix2struct-chartqa-base"
+                
+            print(f"[VLM] Loading Pix2Struct ({model_id})...")
             self.pipe = pipeline(
                 "visual-question-answering", 
-                model="google/pix2struct-chartqa-base",
+                model=model_id,
                 device=0 if torch.cuda.is_available() else -1
             )
             self.available = True
@@ -533,8 +559,15 @@ class Qwen2VLProvider(VLMProvider):
             from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
             from qwen_vl_utils import process_vision_info
             import torch
+            import sys, os
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            try:
+                import config
+                model_id = getattr(config, "QWEN2VL_MODEL_ID", "Qwen/Qwen2-VL-2B-Instruct")
+            except ImportError:
+                model_id = "Qwen/Qwen2-VL-2B-Instruct"
             
-            print("[VLM] Loading Qwen2-VL-2B-Instruct...")
+            print(f"[VLM] Loading {model_id}...")
             
             # Check device
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -543,13 +576,13 @@ class Qwen2VLProvider(VLMProvider):
             # Load model with GPU support
             if device == "cuda":
                 self.model = Qwen2VLForConditionalGeneration.from_pretrained(
-                    "Qwen/Qwen2-VL-2B-Instruct",
+                    model_id,
                     torch_dtype=torch.float16,
                     device_map="auto",
                 )
             else:
                 self.model = Qwen2VLForConditionalGeneration.from_pretrained(
-                    "Qwen/Qwen2-VL-2B-Instruct",
+                    model_id,
                     torch_dtype=torch.float32,
                 )
                 self.model = self.model.to(device)
@@ -558,7 +591,7 @@ class Qwen2VLProvider(VLMProvider):
             min_pixels = 256 * 28 * 28
             max_pixels = 512 * 28 * 28
             self.processor = AutoProcessor.from_pretrained(
-                "Qwen/Qwen2-VL-2B-Instruct",
+                model_id,
                 min_pixels=min_pixels,
                 max_pixels=max_pixels
             )
@@ -643,8 +676,27 @@ class VLMService:
         self.ollama = OllamaProvider()
         self.hf = HuggingFaceProvider()
         self.qwen = QwenProvider()
-        self.qwen2vl = Qwen2VLProvider()  # NEW: Local Qwen2-VL with GPU support
-        self.nemotron = NemotronProvider()
+        
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        try:
+            import config
+            preload = getattr(config, "PRELOAD_LOCAL_MODELS", True)
+        except ImportError:
+            preload = True
+            
+        if preload:
+            self.qwen2vl = Qwen2VLProvider()  # Local Qwen2-VL with GPU support
+            self.nemotron = NemotronProvider()
+            print("[VLM] Local generative models pre-loaded.")
+        else:
+            class DummyProvider:
+                available = False
+                def analyze(self, *args, **kwargs): return "Not loaded"
+            self.qwen2vl = DummyProvider()
+            self.nemotron = DummyProvider()
+            print("[VLM] Skipping local model pre-load to save memory (Configured for Cloud/Ollama).")
+            
         self.chartqa = ChartQAProvider()
         
         self.provider_name = "router" # Dynamic
@@ -906,14 +958,21 @@ class VLMService:
             # 1. Try Qwen2-VL FIRST (Best quality, already loaded, FREE)
             if self.qwen2vl.available:
                 try:
-                    print(f"[VLM-QA] Using Qwen2-VL (GPU) for question: {question[:50]}...")
+                    # Get config model
+                    try:
+                        import config
+                        qwen_model = getattr(config, "QWEN2VL_MODEL_ID", "Qwen2-VL")
+                    except ImportError:
+                        qwen_model = "Qwen2-VL"
+                        
+                    print(f"[VLM-QA] Using PyTorch Local ({qwen_model}) for question: {question[:50]}...")
                     
                     # Add conversational context to get better answers
                     conversational_prompt = f"{question}\n\nProvide a clear, concise answer based on what you see in the image."
                     result = self.qwen2vl.analyze(image, conversational_prompt)
                     
                     if result and "Error" not in result:
-                        print(f"[VLM-QA] Qwen2-VL response: {result[:100]}...")
+                        print(f"[VLM-QA] Local ({qwen_model}) response: {result[:100]}...")
                         return {
                             'answer': result,
                             'confidence': 0.85,  # Higher confidence - better model
@@ -927,16 +986,22 @@ class VLMService:
             # 2. Try Ollama as fallback (FREE and local)
             if ollama is not None:
                 try:
-                    print(f"[VLM-QA] Using Ollama for question: {question[:50]}...")
+                    try:
+                        import config
+                        chat_model = getattr(config, "OLLAMA_CLOUD_MODEL", "llava:latest")
+                    except ImportError:
+                        chat_model = "llava:latest"
+                        
+                    print(f"[VLM-QA] Using Ollama Cloud ({chat_model}) for question: {question[:50]}...")
                     
                     # Convert image to bytes for Ollama
                     img_byte_arr = io.BytesIO()
                     image.save(img_byte_arr, format='JPEG')
                     img_bytes = img_byte_arr.getvalue()
-                    
+
                     # Call Ollama with conversational prompt
                     response = ollama.chat(
-                        model='llava:latest',  # Using llava:latest (7B model)
+                        model=chat_model,
                         messages=[{
                             'role': 'user',
                             'content': f"{question}\n\nProvide a concise, direct answer.",
