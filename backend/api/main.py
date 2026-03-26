@@ -125,7 +125,8 @@ async def health_check():
     try:
         # Import and get status from AI router
         import sys
-        ai_layer_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'ai-intelligence-layer')
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        ai_layer_path = os.path.join(project_root, 'ai-intelligence-layer')
         if ai_layer_path not in sys.path:
             sys.path.insert(0, ai_layer_path)
         
@@ -141,6 +142,8 @@ async def health_check():
     return {
         "status": "healthy",
         "models_loaded": ml_service.loaded,
+        "model_load_error": ml_service.load_error,
+        "model_device": ml_service.device_in_use,
         "gpu_available": getattr(ml_service.detector, 'device', 'cpu') == 'cuda' if ml_service.detector else False,
         "database": "connected",
         "ai_models": ai_model_status,

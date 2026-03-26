@@ -270,6 +270,7 @@ const LiveFeed = ({ isExpanded }) => {
 
     const realScore = metadata?.risk_score || 0;
     const currentScore = Math.max(realScore, vitalityPulse);
+    const feedStatusMessage = metadata?.error || (!metadata ? "MODELS LOADING..." : null);
 
     const getRiskColor = (s) => {
         if (s >= 75) return theme.palette.error.main;
@@ -445,10 +446,10 @@ const LiveFeed = ({ isExpanded }) => {
                     </Box>
                 )}
 
-                {isConnected && !metadata && (
+                {isConnected && feedStatusMessage && (
                     <Box sx={{ position: 'absolute', textAlign: 'center', color: '#fff' }}>
                         <BrainCircuit size={24} className="pulse" style={{ animation: 'pulse 1.5s infinite' }} />
-                        <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>{metadata?.error || "MODELS LOADING..."}</Typography>
+                        <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>{feedStatusMessage}</Typography>
                     </Box>
                 )}
 

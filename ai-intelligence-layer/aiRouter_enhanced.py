@@ -817,15 +817,17 @@ def answer_question(image_data, question):
             'provider': 'error'
         }
     
-    # Try Qwen2-VL first (best for questions)
-    try:
-        analyzer = init_qwen2vl()
-        if analyzer:
+    def _answer_with_qwen2vl():
+        try:
+            analyzer = init_qwen2vl()
+            if not analyzer:
+                return None
+
             import tempfile
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
             image.save(temp_file.name)
             temp_file.close()
-            
+
             try:
                 messages = [
                     {
@@ -836,12 +838,12 @@ def answer_question(image_data, question):
                         ],
                     }
                 ]
-                
+
                 text = analyzer.processor.apply_chat_template(
                     messages, tokenize=False, add_generation_prompt=True
                 )
                 image_inputs, video_inputs = analyzer.process_vision_info(messages)
-                
+
                 inputs = analyzer.processor(
                     text=[text],
                     images=image_inputs,
@@ -850,18 +852,18 @@ def answer_question(image_data, question):
                     return_tensors="pt",
                 )
                 inputs = inputs.to(analyzer.device)
-                
+
                 with torch.no_grad():
                     generated_ids = analyzer.model.generate(**inputs, max_new_tokens=256)
-                
+
                 generated_ids_trimmed = [
                     out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
                 ]
-                
+
                 response = analyzer.processor.batch_decode(
                     generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
                 )[0]
-                
+
                 return {
                     'answer': response,
                     'confidence': 0.8,
@@ -870,35 +872,55 @@ def answer_question(image_data, question):
             finally:
                 if os.path.exists(temp_file.name):
                     os.remove(temp_file.name)
-    except Exception as e:
-        logger.error(f"Qwen2-VL question failed: {e}")
-    
-    # Try Ollama
-    try:
-        if _ollama_available or init_ollama():
+        except Exception as e:
+            logger.error(f"Qwen2-VL question failed: {e}")
+            return None
+
+    def _answer_with_ollama():
+        try:
+            if not (_ollama_available or init_ollama()):
+                return None
+
             import ollama
             import io
-            
+
             img_byte_arr = io.BytesIO()
             image.save(img_byte_arr, format='JPEG')
             img_bytes = img_byte_arr.getvalue()
-            
+
             response = ollama.chat(
-                model='llava:latest',  # Using llava:latest (7B model)
+                model=OLLAMA_MODEL,
                 messages=[{
                     'role': 'user',
                     'content': question,
                     'images': [img_bytes]
                 }]
             )
-            
+
             return {
                 'answer': response['message']['content'],
                 'confidence': 0.75,
                 'provider': 'ollama'
             }
-    except Exception as e:
-        logger.error(f"Ollama question failed: {e}")
+        except Exception as e:
+            logger.error(f"Ollama question failed: {e}")
+            return None
+
+    # Respect configured provider order; fall back only when primary fails.
+    if PRIMARY_PROVIDER == "ollama_cloud":
+        result = _answer_with_ollama()
+        if result:
+            return result
+        result = _answer_with_qwen2vl()
+        if result:
+            return result
+    else:
+        result = _answer_with_qwen2vl()
+        if result:
+            return result
+        result = _answer_with_ollama()
+        if result:
+            return result
     
     return {
         'answer': 'Sorry, I could not analyze the image to answer your question.',

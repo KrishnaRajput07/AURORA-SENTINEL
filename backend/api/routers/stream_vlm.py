@@ -182,7 +182,10 @@ async def websocket_vlm_feed(websocket: WebSocket):
                 continue
 
             if not ml_service.detector:
-                await websocket.send_json({"error": "Models Loading..."})
+                if ml_service.load_error:
+                    await websocket.send_json({"error": f"Model load failed: {ml_service.load_error}"})
+                else:
+                    await websocket.send_json({"error": "Models Loading..."})
                 await asyncio.sleep(0.5)
                 continue
 
@@ -382,6 +385,8 @@ async def websocket_vlm_feed(websocket: WebSocket):
                     active_threats = set()
                     for w in detection.get("weapons", []):
                         active_threats.add(w.get("sub_class", "weapon"))
+                    for f in detection.get("fire", []):
+                        active_threats.add(f.get("class", "fire"))
                     for o in detection.get("objects", []):
                         cls = o.get("class", "")
                         if cls in ["knife", "baseball bat", "scissors", "gun", "fire"]:
@@ -403,6 +408,7 @@ async def websocket_vlm_feed(websocket: WebSocket):
                                 "person_count": len(detection.get("poses", [])),
                                 "object_count": len(detection.get("objects", [])),
                                 "weapon_count": len(detection.get("weapons", [])),
+                                "fire_count": len(detection.get("fire", [])),
                                 "active_threats": list(active_threats),
                             },
                         }
