@@ -13,27 +13,61 @@ import time
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(_HERE))
 
-def _resolve_model_path(model_name):
-    """Resolve model path by checking script dir then project root."""
-    script_dir_path = os.path.join(_HERE, model_name)
-    if os.path.isfile(script_dir_path):
-        return script_dir_path
-    
-    # Fallback to project root (useful if models are at the root)
-    root_path = os.path.join(_PROJECT_ROOT, model_name)
-    if os.path.isfile(root_path):
-        return root_path
-    
-    return script_dir_path # Fallback to original expectation for error reporting
+def _is_lfs_pointer(path):
+    """
+    Best-effort check for a Git-LFS pointer file masquerading as a .pt weight.
+    """
+    if not os.path.isfile(path):
+        return False
+    try:
+        if os.path.getsize(path) > 1024:
+            return False
+        with open(path, 'rb') as fh:
+            head = fh.read(256)
+        return head.startswith(b"version ") and b"git-lfs.github.com/spec/v1" in head
+    except OSError:
+        return False
+
+
+def _candidate_paths(model_name):
+    return [
+        os.path.join(_HERE, model_name),
+        os.path.join(_PROJECT_ROOT, model_name),
+    ]
+
+
+def _resolve_model_path(model_names):
+    """
+    Resolve model path by checking script dir then project root.
+    Accepts a single model name or a list of fallback names.
+    Prefers non-LFS files when multiple candidates exist.
+    """
+    if isinstance(model_names, str):
+        model_names = [model_names]
+
+    first_existing = None
+    for model_name in model_names:
+        for path in _candidate_paths(model_name):
+            if os.path.isfile(path):
+                if first_existing is None:
+                    first_existing = path
+                if not _is_lfs_pointer(path):
+                    return path
+
+    if first_existing:
+        return first_existing
+
+    # Fallback to the first expected location for clearer error reporting.
+    return _candidate_paths(model_names[0])[0]
 
 _MODEL_PATHS = {
     'object':  _resolve_model_path('yolov8n.pt'),        # COCO 80-class general detector
     'pose':    _resolve_model_path('yolov8n-pose.pt'),   # Keypoint / pose estimator
-    'fire':    _resolve_model_path('fir.pt'),             # Custom fire & smoke detector
-    # vehicle.pt and wepon.pt are Git-LFS pointer stubs (not real weights).
-    # Replace these paths with locally-resolved LFS files once pulled.
-    'vehicle': _resolve_model_path('vehicle.pt'),         # Custom vehicle detector (LFS stub)
-    'weapon':  _resolve_model_path('wepon.pt'),           # Custom weapon detector  (LFS stub)
+    'fire':    _resolve_model_path(['fir.pt', 'fire.pt']),           # Custom fire & smoke detector
+    # vehicle.pt / wepon.pt can be Git-LFS pointer stubs (not real weights).
+    # These are loaded only when real binary weights are present.
+    'vehicle': _resolve_model_path(['vehicle.pt', 'vehicles.pt']),   # Custom vehicle detector
+    'weapon':  _resolve_model_path(['weapon.pt', 'wepon.pt', 'weapons.pt', 'gun.pt']),  # Custom weapon detector
 }
 
 # ---------------------------------------------------------------------------
@@ -75,6 +109,12 @@ def _try_load_model(path: str, tag: str, device: str):
     """
     if not os.path.isfile(path):
         print(f"[WARN] {tag} model not found at '{path}' — skipping.")
+        return None
+    if _is_lfs_pointer(path):
+        print(
+            f"[WARN] {tag} model at '{path}' is a Git-LFS pointer, not real weights. "
+            "Run 'git lfs pull' (or copy the actual .pt file) and restart."
+        )
         return None
     try:
         model = YOLO(path)
@@ -249,11 +289,19 @@ class UnifiedDetector:
 
         detections = []
         if results.boxes is not None:
+            names = results.names or {}
             for box in results.boxes:
                 cls_id = int(box.cls[0])
                 conf   = float(box.conf[0])
                 xyxy   = box.xyxy[0].cpu().numpy()
-                label  = _FIRE_CLASS_REMAP.get(cls_id, f'fire_cls_{cls_id}')
+                raw_name = str(names.get(cls_id, '')).strip().lower()
+
+                if raw_name in {'fire', 'flame', 'burning', '火'} or 'fire' in raw_name:
+                    label = 'fire'
+                elif raw_name in {'smoke', 'fume', '烟'} or 'smoke' in raw_name:
+                    label = 'smoke'
+                else:
+                    label = _FIRE_CLASS_REMAP.get(cls_id, raw_name if raw_name else f'fire_cls_{cls_id}')
 
                 detections.append({
                     'class':      label,           # 'fire' or 'smoke'
@@ -351,11 +399,11 @@ class UnifiedDetector:
 
                     is_weapon = any(
                         w in cls_name
-                        for w in ['gun', 'weapon', 'pistol', 'rifle', 'knife',
+                        for w in ['gun', 'weapon', 'firearm', 'handgun', 'pistol', 'rifle', 'shotgun', 'knife',
                                   'machete', 'sword', 'bat', 'scissors']
                     )
 
-                    if is_weapon and conf > 0.60:
+                    if is_weapon and conf > 0.45:
                         weapons.append({
                             'class':     'weapon',
                             'sub_class': cls_name if cls_name != 'unknown' else 'unidentified_threat',
@@ -454,8 +502,8 @@ class UnifiedDetector:
         """Run dummy frames through models to initialise CUDA/weights."""
         print("Warming up models...")
         dummy = np.zeros((640, 640, 3), dtype=np.uint8)
-        for _ in range(3):
-            self.process_frame(dummy)
+        # One pass is enough to initialize kernels while keeping startup latency manageable.
+        self.process_frame(dummy)
         print("Model warmup complete.")
 
 

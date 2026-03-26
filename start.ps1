@@ -15,7 +15,12 @@ function Start-Component {
 }
 
 # 1. Start AI Intelligence Layer (Python-based with local models)
-Write-Host "Starting AI Intelligence Layer (Local Models)..." -ForegroundColor Yellow
+$provider = if ($env:PRIMARY_VLM_PROVIDER) { $env:PRIMARY_VLM_PROVIDER } else { "ollama_cloud" }
+if ($provider -eq "ollama_cloud") {
+    Write-Host "Starting AI Intelligence Layer (Ollama Cloud primary, local Qwen2 fallback)..." -ForegroundColor Yellow
+} else {
+    Write-Host "Starting AI Intelligence Layer (Local Qwen2 primary)..." -ForegroundColor Yellow
+}
 
 if (Test-Path ".\ai-intelligence-layer\venv_ai") {
     # Use Python-based AI layer with local models
@@ -71,12 +76,12 @@ if (-not (Test-Path ".\frontend\node_modules")) {
 Start-Component -Title "Frontend Dashboard" -Command "npm start" -Path ".\frontend"
 
 Write-Host "System Starting!" -ForegroundColor Cyan
-Write-Host "AI Intelligence Layer: http://localhost:3001 (Local Models)" -ForegroundColor White
+Write-Host "AI Intelligence Layer: http://localhost:3001 (Provider Router)" -ForegroundColor White
 Write-Host "Backend API: http://localhost:8000/docs" -ForegroundColor White
 Write-Host "Frontend Dashboard: http://localhost:3000" -ForegroundColor White
 Write-Host ""
 Write-Host "IMPORTANT: Wait for all services to fully initialize before using the system" -ForegroundColor Yellow
 Write-Host "Check each window for startup complete messages" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "Note: AI models will download automatically on first use (2-3 GB)" -ForegroundColor Cyan
-Write-Host "Subsequent starts will be much faster" -ForegroundColor Cyan
+Write-Host "Note: Local fallback models are lazy-loaded on first fallback use" -ForegroundColor Cyan
+Write-Host "If PRIMARY_VLM_PROVIDER=ollama_cloud, Qwen2 is not preloaded at startup" -ForegroundColor Cyan

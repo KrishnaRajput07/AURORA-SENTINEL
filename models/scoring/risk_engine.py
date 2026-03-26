@@ -75,34 +75,19 @@ class RiskScoringEngine:
             'contextual': 0.05
         }
         
-        # ENHANCED FIGHT DETECTION THRESHOLDS
-        self.thresholds = {
-            'loitering_time': 15.0,     # Increased to prevent false positives
-            'unattended_time': 8.0,     # Reduced from 10.0
-            'crowd_multiplier': 1.2,    # Reduced from 1.5
-            'strike_velocity': 0.40,    # 40% of body height per frame (enhanced for fight detection)
-            'proximity_alert': 0.45,    # Scaled by person height
-            # New thresholds for enhanced fight detection
-            'temporal_validation_ratio': 0.30,  # Reduced from 0.50
-            'temporal_window_size': 20,         # Reduced from 30
-            'temporal_suppression_max': 0.4,    # Reduced from 0.6
-            'proximity_distance': 0.40,         # 40% of avg height
-            'proximity_escalation': 3.0,        # Escalation multiplier
-            'grappling_distance': 0.40,         # 40% of avg height
-            'grappling_overlap': 0.60,          # 60% bbox overlap
-            'aggression_raised_arms': 0.7,      # Score for raised arms + stance
-            'aggression_strike': 0.5,           # Score for strike motion
-            'aggression_fighting_stance': 0.6,  # Score for hands near head + wide feet
+        # Immediate-threat handling for deterministic detectors (fire/weapon).
+        # These thresholds are intentionally conservative to avoid under-reacting
+        # to clear hazards while still filtering weak/noisy detections.
+        self.fire_threat_thresholds = {
+            'moderate': 0.50,
+            'high': 0.65,
+            'critical': 0.80,
         }
-        
-        # Per-person keypoint velocity tracking for strike detection
-        self.keypoint_history = defaultdict(lambda: {
-            'wrists': deque(maxlen=10),
-            'ankles': deque(maxlen=10)
-        })
-        
-        # Grappling state tracking
-        self.grappling_history = defaultdict(int)  # {(tid1, tid2): frame_count}
+        self.weapon_threat_thresholds = {
+            'high': 0.50,
+            'critical': 0.70,
+        }
+        self.instant_threat_confidence_floor = 0.85
         
         self.strict_mode = True # Always on for this request
         
@@ -238,6 +223,21 @@ class RiskScoringEngine:
         elapsed = current_time - self.start_time
         if elapsed < self.calibration_duration and not self.is_calibrated:
             self._update_calibration(detection_data)
+
+            # Do not suppress clear hazards during calibration.
+            fire_conf_now = self._analyze_fire(detection_data.get('fire', []))
+            weapon_conf_now = self._analyze_weapons(
+                detection_data.get('weapons', []),
+                detection_data.get('objects', []),
+            )
+            emergency_score = self._estimate_immediate_threat_score(fire_conf_now, weapon_conf_now)
+            if emergency_score > 0:
+                emergency_factors = {k: 0.0 for k in self.weights.keys()}
+                emergency_factors['fire_smoke'] = fire_conf_now
+                emergency_factors['weapon_detection'] = weapon_conf_now
+                self.risk_history.append(emergency_score)
+                return min(100.0, emergency_score * 100), emergency_factors
+
             # Return zeroed dictionary to avoid KeyErrors in callers
             zero_factors = {k: 0.0 for k in self.weights.keys()}
             return 0.0, zero_factors
@@ -277,9 +277,10 @@ class RiskScoringEngine:
         # Bypass suppression for high-confidence combat indicators
         aggression = factors.get('aggressive_posture', 0) or 0
         weapon_conf = factors.get('weapon_detection', 0) or 0
+        fire_conf = factors.get('fire_smoke', 0) or 0
         
-        if weapon_conf > 0.4:
-            suppression_factor = 1.0  # Weapon detection bypasses suppression
+        if weapon_conf > 0.4 or fire_conf >= self.fire_threat_thresholds['moderate']:
+            suppression_factor = 1.0  # Deterministic detector bypass
         elif aggression > 0.6:
             suppression_factor = 1.0  # High aggression bypasses suppression
         else:
@@ -301,12 +302,24 @@ class RiskScoringEngine:
         
         # WEAPON ESCALATION: 
         weapon_conf = factors.get('weapon_detection', 0) or 0
-        if weapon_conf > 0.70: # Hardened to prevent false COCO triggers
-            raw_score = max(raw_score, 0.85) # Immediate Serious Alert
+        if weapon_conf >= self.weapon_threat_thresholds['critical']: # Hardened to prevent false COCO triggers
+            raw_score = max(raw_score, 0.88) # Immediate Serious Alert
             suppression_factor = 1.0 
-        elif weapon_conf > 0.50:
-            raw_score = max(raw_score, 0.5)
-            suppression_factor = max(suppression_factor, 0.9)
+        elif weapon_conf >= self.weapon_threat_thresholds['high']:
+            raw_score = max(raw_score, 0.65)
+            suppression_factor = 1.0
+
+        # FIRE ESCALATION:
+        fire_conf = factors.get('fire_smoke', 0) or 0
+        if fire_conf >= self.fire_threat_thresholds['critical']:
+            raw_score = max(raw_score, 0.92)
+            suppression_factor = 1.0
+        elif fire_conf >= self.fire_threat_thresholds['high']:
+            raw_score = max(raw_score, 0.78)
+            suppression_factor = 1.0
+        elif fire_conf >= self.fire_threat_thresholds['moderate']:
+            raw_score = max(raw_score, 0.60)
+            suppression_factor = 1.0
         
         # ENHANCED FIGHT DETECTION: Aggression + Proximity Escalation
         aggression = factors.get('aggressive_posture', 0) or 0
@@ -358,6 +371,17 @@ class RiskScoringEngine:
         agreement_bonus = sum(1 for v in factors.values() if v is not None and v > 0.4) * 0.1
         temporal_bonus = (len(self.risk_history) / self.risk_history.maxlen) * 0.2
         confidence_score = min(1.0, (0.5 + agreement_bonus + temporal_bonus) * quality_multiplier)
+
+        instant_threat_detected = (
+            weapon_conf >= self.weapon_threat_thresholds['high']
+            or fire_conf >= self.fire_threat_thresholds['moderate']
+        )
+        critical_instant_threat = (
+            weapon_conf >= self.weapon_threat_thresholds['critical']
+            or fire_conf >= self.fire_threat_thresholds['critical']
+        )
+        if instant_threat_detected:
+            confidence_score = max(confidence_score, self.instant_threat_confidence_floor)
         
         # Apply confidence to final risk
         final_risk_score = raw_score * suppression_factor * confidence_score
@@ -373,16 +397,19 @@ class RiskScoringEngine:
              validation_ratio = high_risk_frames / len(self.risk_history)
              
              if final_risk_score > 0.75:
-                 # Critical threats need at least 30% temporal support (reduced from 50%)
-                 if validation_ratio < self.thresholds['temporal_validation_ratio']:
+                 # Critical deterministic threats bypass temporal suppression.
+                 if (not critical_instant_threat) and validation_ratio < self.thresholds['temporal_validation_ratio']:
                      final_risk_score *= self.thresholds['temporal_suppression_max']  # Max 0.4 suppression (was 0.6)
              elif final_risk_score > 0.4:
-                 # Medium threats need 30% support
-                 if validation_ratio < self.thresholds['temporal_validation_ratio']:
+                 # Medium threats need 30% support.
+                 if (not instant_threat_detected) and validation_ratio < self.thresholds['temporal_validation_ratio']:
                      final_risk_score *= 0.7
                      
         # Use mean for smoothed output
         smoothed_score = np.mean(self.risk_history)
+        if instant_threat_detected:
+            # Keep smoothing but avoid masking active high-confidence hazards.
+            smoothed_score = max(smoothed_score, final_risk_score * 0.9)
         
         # Return percentage (0-100)
         return min(100.0, smoothed_score * 100), factors
@@ -427,6 +454,27 @@ class RiskScoringEngine:
                 max_fire_conf = max(max_fire_conf, conf * 0.4)
                 
         return max_fire_conf
+
+    def _estimate_immediate_threat_score(self, fire_conf, weapon_conf):
+        """
+        Estimate emergency raw risk (0-1) for deterministic hazards.
+        Used during calibration and as a shared policy baseline.
+        """
+        threat_score = 0.0
+
+        if weapon_conf >= self.weapon_threat_thresholds['critical']:
+            threat_score = max(threat_score, 0.88)
+        elif weapon_conf >= self.weapon_threat_thresholds['high']:
+            threat_score = max(threat_score, 0.65)
+
+        if fire_conf >= self.fire_threat_thresholds['critical']:
+            threat_score = max(threat_score, 0.92)
+        elif fire_conf >= self.fire_threat_thresholds['high']:
+            threat_score = max(threat_score, 0.78)
+        elif fire_conf >= self.fire_threat_thresholds['moderate']:
+            threat_score = max(threat_score, 0.60)
+
+        return min(1.0, threat_score)
 
     def _update_history(self, poses):
         """Update movement history for tracked persons"""
