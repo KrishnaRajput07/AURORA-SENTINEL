@@ -1,147 +1,169 @@
-# 👋 Hey! Want to Run AURORA on Your Machine?
+﻿# 👋 Hey! Want to Run AURORA on Your Machine?
 
-This guide is written in simple words. Follow step by step and it will work.
+This guide is simple and updated for the current codebase.
 
 ---
 
-## 🤔 First — Clone or Pull?
+## 🤔 First: Clone or Pull?
 
-**Simple rule:**
-- **First time on your machine? → CLONE**
-- **Already have it and just want latest changes? → PULL**
+Simple rule:
+- First time on your machine -> **CLONE**
+- You already have the repo -> **PULL**
 
 ---
 
 ## ✅ Prerequisites
 
-Install these before you start:
+Install these first:
 
-| Tool | Why? | Download Link |
-|------|------|---------------|
-| **Python 3.10+** | Runs the backend | [python.org](https://www.python.org/downloads/) |
-| **Node.js 18+** | Runs the frontend | [nodejs.org](https://nodejs.org/) |
-| **Git** | Downloads the code | [git-scm.com](https://git-scm.com/) |
-| **FFmpeg** | Processes video clips | [ffmpeg.org](https://ffmpeg.org/download.html) |
-| **Ollama** (Optional) | Local AI analysis | [ollama.com](https://ollama.com/) |
+| Tool | Why? | Download |
+|------|------|----------|
+| Python 3.10+ | Backend + AI layer | [python.org](https://www.python.org/downloads/) |
+| Node.js 18+ | Frontend dev server | [nodejs.org](https://nodejs.org/) |
+| Git | Clone/pull code | [git-scm.com](https://git-scm.com/) |
+| FFmpeg | Video processing/transcode | [ffmpeg.org](https://ffmpeg.org/download.html) |
+| Ollama (optional) | If using Ollama provider | [ollama.com](https://ollama.com/) |
 
 > [!IMPORTANT]
-> **FFmpeg is required.** On Windows, download the "essentials" build, extract it, and add the `bin` folder to your Path.
+> FFmpeg must be on your system `PATH`.
 
 ---
 
-## 🆕 FIRST TIME SETUP (Clone)
+## 🆕 First-Time Setup (Clone)
 
-### Step 1 — Clone the project
+### 1) Clone
 ```bash
-git clone https://github.com/pratap-shrey/AURORA-SENTINEL.git
+git clone https://github.com/git-pratap-shrey/AURORA-SENTINEL.git
 cd AURORA-SENTINEL
 ```
 
-### Step 2 — Get the "Large Assets" (Optional but Recommended)
-The AI models and sample videos are very large (~5GB). Instead of downloading them via scripts, ask the project owner for the **`AURORA_ASSETS.rar`** file.
-- Extract it into the root folder.
-- It should give you the `models/` and `data/` folders ready to use.
+### 2) Large assets (optional but recommended)
+Models + sample data can be large. If available, get `AURORA_ASSETS.rar` from the project owner and extract at repo root so folders like `models/` and `data/` are present.
 
----
-
-### Step 3 — Create a virtual environment
+### 3) Create and activate virtual environment
 ```bash
 python -m venv venv
 ```
-**Activate it:**
-- **Windows:** `venv\Scripts\activate`
-- **Mac/Linux:** `source venv/bin/activate`
 
-### Step 4 — Install dependencies
+Activate:
+- Windows: `venv\Scripts\activate`
+- Linux/Mac/WSL: `source venv/bin/activate`
+
+### 4) Install dependencies
 ```bash
-# Install Backend dependencies
+python -m pip install --upgrade pip
 pip install -r requirements/backend.txt
-
-# Install AI Intelligence dependencies
 pip install -r requirements/ai-intelligence.txt
-
-# Install Frontend dependencies
-cd frontend
-npm install
-cd ..
+cd frontend && npm install && cd ..
 ```
 
----
-
-### Step 5 — Create your `.env` file
-Create a file named `.env` in the root folder and paste this:
+### 5) Create `.env` in repo root
+Use this starter:
 
 ```env
-# AI Provider: gemini or ollama
-VLM_PROVIDER=gemini
+# AI provider routing
+# Options: ollama_cloud | qwen2vl_local
+PRIMARY_VLM_PROVIDER=ollama_cloud
 
-# Google Gemini API Key (Get at: https://aistudio.google.com/app/apikey)
+# Ollama model tag used by backend VLM provider
+OLLAMA_CLOUD_MODEL=qwen3-vl:235b-cloud
+
+# Local Qwen2-VL model
+QWEN2VL_MODEL_ID=Qwen/Qwen2-VL-2B-Instruct
+
+# Optional cloud fallback
 GEMINI_API_KEY=your_key_here
 
-# Local AI URL (Only if using local-ai-layer)
-LOCAL_AI_URL=http://localhost:3001/analyze
+# Local heavy model gate (Nemotron verification)
+ENABLE_HEAVY_MODELS=false
 
-# Database & Storage
+# DB + storage
 DATABASE_URL=sqlite:///./aurora.db
 STORAGE_DIR=storage/clips
+PROCESSED_PATH=storage/processed
+BIN_PATH=storage/bin
+TEMP_PATH=storage/temp
 ```
 
 ---
 
-## 🚀 HOW TO RUN (THE EASY WAY)
+## 🚀 Run (Easy Way)
 
-We've created automation scripts so you don't have to open 3 terminals.
-
-### Windows (PowerShell):
+### Windows (PowerShell)
 ```powershell
 .\start.ps1
 ```
 
-### Linux / WSL / Mac:
+### Linux / WSL / Mac
 ```bash
 chmod +x start.sh
 ./start.sh
 ```
-*This will automatically start the AI Layer, Backend, and Frontend for you.*
+
+This starts:
+- AI layer on `http://localhost:3001`
+- Backend API on `http://localhost:8000/docs`
+- Frontend on `http://localhost:3000`
 
 ---
 
-## 🐳 Running with Docker (Easiest)
-If you have Docker Desktop installed, just run:
-```bash
-docker-compose up --build
-```
-Everything will start automatically inside containers.
+## 🔄 Update Existing Setup
 
----
-
-## 🔄 ALREADY HAVE IT? (Update)
 ```bash
 git pull origin main
 pip install -r requirements/backend.txt
+pip install -r requirements/ai-intelligence.txt
 cd frontend && npm install && cd ..
-python apply_migration.py
 ```
+
+Notes:
+- Do **not** run `python apply_migration.py` (that script does not exist).
+- Database/table creation and alert-column compatibility are handled at backend startup.
+
+---
+
+## 🐳 Docker (What It Actually Starts)
+
+```bash
+docker-compose up --build
+```
+
+Current compose starts:
+- `api` (FastAPI on `8000`)
+- `postgres`
+- `redis`
+
+It does not start the frontend dev server on `3000`.
 
 ---
 
 ## ❓ Common Problems
 
-- **"FFmpeg not found":** You must add FFmpeg to your system PATH.
-- **Port 8000/3000 in use:** A previous run might still be stuck. Restart your terminal or kill the process.
-- **Venv not active:** Make sure you see `(venv)` in your terminal before running commands.
+- `"ffmpeg not found"`: Add FFmpeg `bin` to `PATH`.
+- Ports busy (`3000`, `3001`, `8000`): stop old processes and retry.
+- Venv not active: ensure prompt shows `(venv)` before pip/python commands.
+- AI layer fails to start: run `pip install -r requirements/ai-intelligence.txt` again in your active venv.
+- Ollama errors with `PRIMARY_VLM_PROVIDER=ollama_cloud`: start Ollama locally or switch to `PRIMARY_VLM_PROVIDER=qwen2vl_local`.
+- First run is slow: model downloads can take several GB.
 
 ---
 
 ## 📋 Quick Checklist
-- [ ] Python 3.10+ & Node.js installed
-- [ ] FFmpeg installed and in PATH
+
+- [ ] Python 3.10+ and Node.js 18+ installed
+- [ ] FFmpeg installed and available on `PATH`
 - [ ] `venv` created and activated
-- [ ] `.env` file created with valid Gemini Key
-- [ ] `npm install` done in `frontend/`
-- [ ] Model files (`.pt`) present in root or `models/`
+- [ ] Backend + AI + frontend dependencies installed
+- [ ] `.env` created with valid values
+- [ ] Model files (`yolov8*.pt`) available in repo root (or downloaded on first use)
 
 ---
 
 ## 💬 Still Stuck?
-Ask the project owner! They can help you debug specific environment issues.
+
+Share:
+- Your OS
+- The exact command you ran
+- The full error text
+
+Then the project owner can debug quickly.
