@@ -39,14 +39,14 @@ export const LayoutGrid = ({ cards, columns = 3 }) => {
                     >
                         <motion.div
                             layout
-                            onClick={() => !isSelected && setSelectedId(card.id)}
+                            onClick={() => !isSelected && card.isMaximizable && setSelectedId(card.id)}
                             transition={{
                                 type: "spring",
                                 stiffness: 260,
                                 damping: 20,
                             }}
                             style={{
-                                cursor: isSelected ? "default" : "pointer",
+                                cursor: isSelected ? "default" : (card.isMaximizable ? "pointer" : "default"),
                                 width: "100%",
                                 height: "100%",
                                 borderRadius: "8px",
@@ -60,13 +60,13 @@ export const LayoutGrid = ({ cards, columns = 3 }) => {
                                     margin: "0 auto",
                                     boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
                                 } : {
-                                    position: "absolute",
+                                    position: "relative",
                                     top: 0,
                                     left: 0,
                                 })
                             }}
-                            whileHover={!isSelected ? { scale: 1.02 } : {}}
-                            whileTap={!isSelected ? { scale: 0.98 } : {}}
+                            whileHover={!isSelected && card.isMaximizable ? { scale: 1.02 } : {}}
+                            whileTap={!isSelected && card.isMaximizable ? { scale: 0.98 } : {}}
                         >
                             {isSelected && (
                                 <Box sx={{ position: 'absolute', top: -48, right: 0, zIndex: 1002 }}>

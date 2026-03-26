@@ -103,6 +103,7 @@ const Dashboard = () => {
                         },
                         {
                             id: 'camera',
+                            isMaximizable: true,
                             colSpan: { xs: 'span 1', md: 'span 1' },
                             content: ({ isSelected }) => (
                                 <Paper sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', pointerEvents: 'auto' }}>

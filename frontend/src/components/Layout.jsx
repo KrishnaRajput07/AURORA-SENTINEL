@@ -31,7 +31,7 @@ const Layout = ({ children }) => {
     };
 
     const menuItems = [
-        { text: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/', roles: ['operator', 'admin'] },
+        { text: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/dashboard', roles: ['operator', 'admin'] },
         { text: 'Admin Panel', icon: <ShieldAlert size={18} />, path: '/admin', roles: ['admin'] },
         { text: 'Surveillance', icon: <Video size={18} />, path: '/surveillance', roles: ['operator', 'admin'] },
         { text: 'Intelligence', icon: <BarChart2 size={18} />, path: '/intelligence', roles: ['operator', 'admin'] },
@@ -143,7 +143,7 @@ const Layout = ({ children }) => {
                                 alt="Aurora Sentinel"
                                 sx={{ width: 40, height: 40, objectFit: 'contain', borderRadius: '8px' }}
                             />
-                            <Box sx={{ pointerEvents: 'auto', cursor: 'pointer' }} onClick={() => navigate('/')}>
+                            <Box sx={{ pointerEvents: 'auto', cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>
                                 <Typography variant="h6" sx={{
                                     lineHeight: 1,
                                     color: theme.palette.text.primary,
