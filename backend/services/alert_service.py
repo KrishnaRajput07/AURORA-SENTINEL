@@ -5,10 +5,19 @@ Generates operator alerts with two-tier score metadata.
 """
 
 import logging
+import sys
+import os
 from datetime import datetime
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
+
+# Load config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+try:
+    import config
+except ImportError:
+    config = None
 
 
 class AlertService:
@@ -46,13 +55,17 @@ class AlertService:
         detection_source = scoring_result['detection_source']
         
         # Determine alert level and color based on Final_Score
-        if final_score > 70:
+        critical_th = getattr(config, 'ALERT_LEVEL_CRITICAL', 70) if config else 70
+        high_th = getattr(config, 'ALERT_LEVEL_HIGH', 50) if config else 50
+        medium_th = getattr(config, 'ALERT_LEVEL_MEDIUM', 30) if config else 30
+
+        if final_score > critical_th:
             level = 'critical'
             color = 'red'
-        elif final_score > 50:
+        elif final_score > high_th:
             level = 'high'
             color = 'orange'
-        elif final_score > 30:
+        elif final_score > medium_th:
             level = 'medium'
             color = 'yellow'
         else:
@@ -166,11 +179,15 @@ class AlertService:
         Returns:
             Color string: "red" | "orange" | "yellow" | "green"
         """
-        if final_score > 70:
+        critical_th = getattr(config, 'ALERT_LEVEL_CRITICAL', 70) if config else 70
+        high_th = getattr(config, 'ALERT_LEVEL_HIGH', 50) if config else 50
+        medium_th = getattr(config, 'ALERT_LEVEL_MEDIUM', 30) if config else 30
+
+        if final_score > critical_th:
             return 'red'
-        elif final_score > 50:
+        elif final_score > high_th:
             return 'orange'
-        elif final_score > 30:
+        elif final_score > medium_th:
             return 'yellow'
         else:
             return 'green'

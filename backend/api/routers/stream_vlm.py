@@ -1,7 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.services.ml_service import ml_service
 from backend.services.video_storage_service import video_storage_service
-from backend.services.vlm_service import vlm_service # NEW
+from backend.services.vlm_service import vlm_service
 from backend.db.database import SessionLocal
 from backend.db.models import Alert
 import cv2
@@ -11,6 +11,15 @@ import base64
 from datetime import datetime
 import time
 from PIL import Image
+import sys
+import os
+
+# Load config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+try:
+    import config
+except ImportError:
+    config = None
 
 router = APIRouter()
 
@@ -72,19 +81,19 @@ async def websocket_vlm_feed(websocket: WebSocket):
     
     # State
     last_alert_time = 0
-    ALERT_COOLDOWN = 10
+    ALERT_COOLDOWN = getattr(config, 'ALERT_COOLDOWN_SECONDS', 10) if config else 10
     
     # VLM State
     last_vlm_time = 0
-    VLM_INTERVAL = 10 # seconds (Analyze every 5s by default)
+    VLM_INTERVAL = getattr(config, 'VLM_ANALYSIS_INTERVAL', 10) if config else 10
     current_narrative = "Initializing AI Analysis..."
-    vlm_task = None # Handle for the background task
+    vlm_task = None
 
-    # Change-point / motion state (cheap, catches fights ML may miss)
+    # Change-point / motion state
     prev_gray_small = None
     ema_motion = 0.0
     last_change_trigger_time = 0.0
-    CHANGE_TRIGGER_COOLDOWN = 3.0  # seconds
+    CHANGE_TRIGGER_COOLDOWN = getattr(config, 'CHANGE_TRIGGER_COOLDOWN', 3.0) if config else 3.0
     last_motion_diff = 0.0
     last_scene_change = False
     
@@ -166,8 +175,9 @@ async def websocket_vlm_feed(websocket: WebSocket):
                         
                         # 3. Trigger New VLM Analysis (If idle)
                         now = time.time()
+                        _vlm_high_risk_interval = getattr(config, 'VLM_HIGH_RISK_INTERVAL', 3) if config else 3
                         should_trigger = (
-                            (risk_score > 60 and (now - last_vlm_time > 3)) or
+                            (risk_score > 60 and (now - last_vlm_time > _vlm_high_risk_interval)) or
                             (now - last_vlm_time > VLM_INTERVAL) or
                             ((is_motion_spike or is_scene_change) and (now - last_change_trigger_time > CHANGE_TRIGGER_COOLDOWN))
                         )
@@ -197,13 +207,14 @@ async def websocket_vlm_feed(websocket: WebSocket):
 
                     # Alert Logic
                     alert = None
-                    if risk_score > 65:
+                    _live_alert_th = getattr(config, 'LIVE_ALERT_THRESHOLD', 65) if config else 65
+                    if risk_score > _live_alert_th:
                         alert = ml_service.risk_engine.generate_alert(risk_score, risk_factors if not is_vlm_running else [])
                         alert['level'] = alert['level'].upper()
-                        # Add VLM insight to alert
                         alert['ai_analysis'] = current_narrative
                         
-                        if risk_score > 80:
+                        _recording_th = getattr(config, 'RECORDING_THRESHOLD', 80) if config else 80
+                        if risk_score > _recording_th:
                             video_storage_service.start_recording("CAM-01")
                         
                         now_ts = datetime.utcnow().timestamp()

@@ -8,7 +8,16 @@ import numpy as np
 import asyncio
 import base64
 from datetime import datetime
-import time # Added for duration measurement
+import time
+import sys
+import os
+
+# Load config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+try:
+    import config
+except ImportError:
+    config = None
 
 router = APIRouter()
 
@@ -44,11 +53,11 @@ async def websocket_live_feed(websocket: WebSocket):
     print("WebSocket connected (Robust)")
     
     frame_count = 0
-    SKIP_FRAMES = 1 # Process 1 out of every 2 frames (Increased from 1/3)
+    SKIP_FRAMES = 1
     
     # State for deduping alerts (prevent spamming DB)
     last_alert_time = 0
-    ALERT_COOLDOWN = 10 # Seconds between persistent alerts
+    ALERT_COOLDOWN = getattr(config, 'ALERT_COOLDOWN_SECONDS', 10) if config else 10
     
     cached_result = {
         "detection": {"poses": [], "objects": []}, 
@@ -101,11 +110,13 @@ async def websocket_live_feed(websocket: WebSocket):
                     risk_score = risk_score or 0
                         
                     alert = None
-                    if risk_score > 65: # New threshold from previous task
+                    _live_alert_th = getattr(config, 'LIVE_ALERT_THRESHOLD', 65) if config else 65
+                    if risk_score > _live_alert_th:
                         alert = ml_service.risk_engine.generate_alert(risk_score, risk_factors)
                         alert['level'] = alert['level'].upper()
                         
-                        if risk_score > 80:
+                        _recording_th = getattr(config, 'RECORDING_THRESHOLD', 80) if config else 80
+                        if risk_score > _recording_th:
                             video_storage_service.start_recording("CAM-01")
                         
                         now = datetime.utcnow().timestamp()

@@ -73,7 +73,7 @@ class OfflineProcessor:
         # ml_service.load_models() # MOVED to scan_and_process
         
         # Configuration
-        ANALYSIS_INTERVAL = 2 # Check ML every 2 seconds
+        ANALYSIS_INTERVAL = getattr(config, 'OFFLINE_ANALYSIS_INTERVAL', 2) if config else 2
         frame_step = int(fps * ANALYSIS_INTERVAL)
         
         events = []
@@ -132,11 +132,15 @@ class OfflineProcessor:
                         if re.search(r'\b' + re.escape(k) + r'\b', lower_desc):
                             detected_threats.append(v)
 
+                    _sport_cap = getattr(config, 'SPORT_RISK_CAP', 15) if config else 15
+                    _high_th = getattr(config, 'SEVERITY_HIGH_THRESHOLD', 65) if config else 65
+                    _med_th = getattr(config, 'SEVERITY_MEDIUM_THRESHOLD', 35) if config else 35
+
                     if any(x in ["sport_boxing"] for x in detected_threats):
                         severity = "low"
-                        suggested_risk = min(suggested_risk, 15)
-                    elif suggested_risk >= 65: severity = "high"
-                    elif suggested_risk >= 35: severity = "medium"
+                        suggested_risk = min(suggested_risk, _sport_cap)
+                    elif suggested_risk >= _high_th: severity = "high"
+                    elif suggested_risk >= _med_th: severity = "medium"
 
                     # Enrich description with ML findings if VLM is too generic
                     if len(description) < 40:

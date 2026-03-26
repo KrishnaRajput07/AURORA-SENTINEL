@@ -11,10 +11,19 @@ If the final weighted score exceeds the alert threshold (60%), the operator is n
 
 import asyncio
 import logging
+import sys
+import os
 from typing import Dict, Any, Optional
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# Load config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+try:
+    import config
+except ImportError:
+    config = None
 
 
 class TwoTierScoringService:
@@ -32,7 +41,7 @@ class TwoTierScoringService:
         """
         self.risk_engine = risk_engine
         self.ai_client = ai_client
-        self.alert_threshold = 60.0  # Alert if either ML or AI score exceeds this
+        self.alert_threshold = getattr(config, 'ALERT_THRESHOLD', 60.0) if config else 60.0
         
     async def calculate_scores(self, frame, detection_data, context=None):
         """
@@ -63,9 +72,10 @@ class TwoTierScoringService:
         # 1. Calculate ML score using risk engine (synchronous)
         ml_score, ml_factors = self.risk_engine.calculate_risk(detection_data, context)
         
-        # 2. Check ML threshold optimization (skip AI if ML score < 20)
+        # 2. Check ML threshold optimization (skip AI if ML score < threshold)
+        ml_skip_threshold = getattr(config, 'ML_SKIP_AI_THRESHOLD', 20) if config else 20
         skip_ai_analysis = False
-        if ml_score is not None and ml_score < 20:
+        if ml_score is not None and ml_score < ml_skip_threshold:
             skip_ai_analysis = True
             logger.info(f"ML score ({ml_score:.1f}) below threshold (20), skipping AI analysis to conserve resources")
         
@@ -121,11 +131,13 @@ class TwoTierScoringService:
         overall_confidence = 0.0
         
         if ai_score is not None and ml_score is not None:
-            # Both available: weighted calculation (0.3 * ML + 0.7 * AI)
-            final_score = (0.3 * ml_score) + (0.7 * ai_score)
+            # Both available: weighted calculation
+            ml_w = getattr(config, 'ML_SCORE_WEIGHT', 0.3) if config else 0.3
+            ai_w = getattr(config, 'AI_SCORE_WEIGHT', 0.7) if config else 0.7
+            final_score = (ml_w * ml_score) + (ai_w * ai_score)
             scoring_method = "weighted"
-            overall_confidence = 0.8  # High confidence when both available
-            logger.info(f"Weighted scoring: 0.3×{ml_score:.1f} + 0.7×{ai_score:.1f} = {final_score:.1f}")
+            overall_confidence = getattr(config, 'CONFIDENCE_BOTH_AVAILABLE', 0.8) if config else 0.8
+            logger.info(f"Weighted scoring: {ml_w}×{ml_score:.1f} + {ai_w}×{ai_score:.1f} = {final_score:.1f}")
             
             # Log component scores for audit
             ai_score_raw_str = f"{ai_score_raw:.1f}" if ai_score_raw is not None else "N/A"
@@ -134,18 +146,18 @@ class TwoTierScoringService:
                 logger.info(f"[AUDIT] Nemotron: verified={nemotron_verification.get('verified')}, agreement={nemotron_verification.get('agreement')}, recommended={nemotron_verification.get('recommended_score')}")
         
         elif ai_score is None and ml_score is not None:
-            # AI unavailable: Final = ML, confidence 0.3
+            # AI unavailable: Final = ML
             final_score = ml_score
             scoring_method = "ml_only"
-            overall_confidence = 0.3
+            overall_confidence = getattr(config, 'CONFIDENCE_ML_ONLY', 0.3) if config else 0.3
             logger.info(f"AI unavailable, using ML score only: Final={final_score:.1f} (confidence=0.3)")
             logger.info(f"[AUDIT] ML_Score={ml_score:.1f}, AI_Score=unavailable, Final={final_score:.1f}")
         
         elif ai_score is not None and ml_score is None:
-            # ML unavailable: Final = AI, confidence 0.6
+            # ML unavailable: Final = AI
             final_score = ai_score
             scoring_method = "ai_only"
-            overall_confidence = 0.6
+            overall_confidence = getattr(config, 'CONFIDENCE_AI_ONLY', 0.6) if config else 0.6
             logger.info(f"ML unavailable, using AI score only: Final={final_score:.1f} (confidence=0.6)")
             logger.info(f"[AUDIT] ML_Score=unavailable, AI_Score={ai_score:.1f}, Final={final_score:.1f}")
         
@@ -153,7 +165,7 @@ class TwoTierScoringService:
             # Both unavailable: fallback to 0
             final_score = 0.0
             scoring_method = "none"
-            overall_confidence = 0.0
+            overall_confidence = getattr(config, 'CONFIDENCE_NONE', 0.0) if config else 0.0
             logger.warning("Both ML and AI unavailable, final score = 0")
             logger.info(f"[AUDIT] ML_Score=unavailable, AI_Score=unavailable, Final=0.0")
         

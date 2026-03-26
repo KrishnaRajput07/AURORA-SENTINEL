@@ -29,3 +29,62 @@ EMBEDDING_MODEL_ID = os.getenv("EMBEDDING_MODEL_ID", "all-MiniLM-L6-v2")
 # PyTorch Local Generative Models
 NEMOTRON_MODEL_ID = os.getenv("NEMOTRON_MODEL_ID", "nvidia/nemotron-colembed-vl-4b-v2")
 PIX2STRUCT_MODEL_ID = os.getenv("PIX2STRUCT_MODEL_ID", "google/pix2struct-chartqa-base")
+
+# -------------------------------------------------------------------
+# SCORING THRESHOLDS
+# -------------------------------------------------------------------
+
+# Two-tier scoring weights (Final = ML_WEIGHT * ML + AI_WEIGHT * AI)
+ML_SCORE_WEIGHT = 0.3
+AI_SCORE_WEIGHT = 0.7
+
+# Alert thresholds
+ALERT_THRESHOLD = 60.0          # Uploaded video: alert if final_score exceeds this
+LIVE_ALERT_THRESHOLD = 65       # Live stream: alert if risk_score exceeds this
+RECORDING_THRESHOLD = 80        # Live stream: auto-start recording above this
+
+# ML-to-AI gating
+ML_SKIP_AI_THRESHOLD = 20       # Skip AI analysis if ML score is below this
+STRUCTURED_PROMPT_THRESHOLD = 70 # Use detailed JSON prompt above this ML score
+
+# Alert severity levels (based on final_score)
+ALERT_LEVEL_CRITICAL = 70
+ALERT_LEVEL_HIGH = 50
+ALERT_LEVEL_MEDIUM = 30
+
+# Sport/boxing safety cap
+SPORT_RISK_CAP = 15             # Max risk when sport indicators detected
+
+# -------------------------------------------------------------------
+# TIMING & INTERVALS
+# -------------------------------------------------------------------
+
+ALERT_COOLDOWN_SECONDS = 10     # Min seconds between persisted alerts
+VLM_ANALYSIS_INTERVAL = 10     # Seconds between periodic VLM calls (live)
+VLM_HIGH_RISK_INTERVAL = 3     # Min seconds between VLM calls for high risk
+OFFLINE_ANALYSIS_INTERVAL = 2   # Seconds between ML checks on uploaded video
+CHANGE_TRIGGER_COOLDOWN = 3.0   # Min seconds between motion-triggered VLM calls
+
+# -------------------------------------------------------------------
+# TIMEOUTS
+# -------------------------------------------------------------------
+
+AI_TOTAL_TIMEOUT = 5.0          # Hard cap on total AI analysis time
+NEMOTRON_TIMEOUT = 3.0          # Max time for Nemotron verification
+QWEN_TIMEOUT = 2.0             # Max time for Qwen2-VL analysis
+
+# -------------------------------------------------------------------
+# SEVERITY THRESHOLDS (for uploaded video event classification)
+# -------------------------------------------------------------------
+
+SEVERITY_HIGH_THRESHOLD = 65
+SEVERITY_MEDIUM_THRESHOLD = 35
+
+# -------------------------------------------------------------------
+# SCORING CONFIDENCE VALUES
+# -------------------------------------------------------------------
+
+CONFIDENCE_BOTH_AVAILABLE = 0.8  # When both ML and AI scores exist
+CONFIDENCE_ML_ONLY = 0.3         # When only ML score available
+CONFIDENCE_AI_ONLY = 0.6         # When only AI score available
+CONFIDENCE_NONE = 0.0            # When neither available

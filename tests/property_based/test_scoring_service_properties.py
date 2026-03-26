@@ -101,10 +101,15 @@ async def test_property_2_score_consistency(ml_score, ai_score):
     
     # CRITICAL PROPERTY: Score consistency based on availability
     if ml_score is not None and ai_score is not None:
-        # Both available: weighted calculation
-        expected_final = (0.3 * ml_score) + (0.7 * ai_score)
-        expected_method = 'weighted'
-        expected_confidence = 0.8
+        if ml_score < 20:
+            expected_final = ml_score
+            expected_method = 'ml_only'
+            expected_confidence = 0.3
+        else:
+            # Both available: weighted calculation
+            expected_final = (0.3 * ml_score) + (0.7 * ai_score)
+            expected_method = 'weighted'
+            expected_confidence = 0.8
         
         assert abs(result['final_score'] - expected_final) < 0.01, (
             f"Weighted scoring violated! "
@@ -124,8 +129,9 @@ async def test_property_2_score_consistency(ml_score, ai_score):
         assert result['ml_score'] == ml_score, (
             f"ML score not preserved: expected {ml_score}, got {result['ml_score']}"
         )
-        assert result['ai_score'] == ai_score, (
-            f"AI score not preserved: expected {ai_score}, got {result['ai_score']}"
+        expected_ai_score = 0.0 if ml_score < 20 else ai_score
+        assert result['ai_score'] == expected_ai_score, (
+            f"AI score not preserved: expected {expected_ai_score}, got {result['ai_score']}"
         )
     
     elif ml_score is not None and ai_score is None:
@@ -300,27 +306,31 @@ async def test_property_4_weighted_calculation_correctness(ml_score, ai_score):
     result = await scoring_service.calculate_scores(frame, detection_data, context)
     
     # CRITICAL PROPERTY: Weighted calculation must be exact
-    expected_final = (0.3 * ml_score) + (0.7 * ai_score)
+    if ml_score < 20:
+        expected_final = ml_score
+    else:
+        expected_final = (0.3 * ml_score) + (0.7 * ai_score)
     
     assert abs(result['final_score'] - expected_final) < 0.01, (
         f"Weighted calculation incorrect! "
         f"ML={ml_score}, AI={ai_score}, "
-        f"Expected: 0.3*{ml_score} + 0.7*{ai_score} = {expected_final:.2f}, "
+        f"Expected: {expected_final:.2f}, "
         f"Got: {result['final_score']:.2f}"
     )
     
     # Verify the weights are correct (not 50/50 or any other split)
-    ml_contribution = 0.3 * ml_score
-    ai_contribution = 0.7 * ai_score
-    
-    # The final score should be the sum of these contributions
-    assert abs(result['final_score'] - (ml_contribution + ai_contribution)) < 0.01, (
-        f"Weight distribution incorrect! "
-        f"ML contribution (30%): {ml_contribution:.2f}, "
-        f"AI contribution (70%): {ai_contribution:.2f}, "
-        f"Sum: {ml_contribution + ai_contribution:.2f}, "
-        f"Got: {result['final_score']:.2f}"
-    )
+    if ml_score >= 20:
+        ml_contribution = 0.3 * ml_score
+        ai_contribution = 0.7 * ai_score
+        
+        # The final score should be the sum of these contributions
+        assert abs(result['final_score'] - (ml_contribution + ai_contribution)) < 0.01, (
+            f"Weight distribution incorrect! "
+            f"ML contribution (30%): {ml_contribution:.2f}, "
+            f"AI contribution (70%): {ai_contribution:.2f}, "
+            f"Sum: {ml_contribution + ai_contribution:.2f}, "
+            f"Got: {result['final_score']:.2f}"
+        )
 
 
 # ============================================================================
@@ -387,29 +397,37 @@ async def test_property_5_nemotron_adjustment_integration(
     result = await scoring_service.calculate_scores(frame, detection_data, context)
     
     # CRITICAL PROPERTY: Must use Nemotron-adjusted score in weighted calculation
-    expected_final = (0.3 * ml_score) + (0.7 * nemotron_adjusted_score)
-    
-    assert abs(result['final_score'] - expected_final) < 0.01, (
-        f"Nemotron adjustment not used in weighted calculation! "
-        f"ML={ml_score}, AI_raw={ai_score_raw}, AI_adjusted={nemotron_adjusted_score}, "
-        f"Expected: 0.3*{ml_score} + 0.7*{nemotron_adjusted_score} = {expected_final:.2f}, "
-        f"Got: {result['final_score']:.2f}"
-    )
-    
-    # Verify Nemotron verification details are included
-    assert 'nemotron_verification' in result, (
-        "Nemotron verification details missing from result"
-    )
-    
-    assert result['nemotron_verification'] == nemotron_verification, (
-        "Nemotron verification details not correctly passed through"
-    )
+    if ml_score < 20:
+        expected_final = ml_score
+        assert abs(result['final_score'] - expected_final) < 0.01, (
+            f"Expected ml_only fallback! "
+            f"ML={ml_score}, Expected: {expected_final:.2f}, Got: {result['final_score']:.2f}"
+        )
+    else:
+        expected_final = (0.3 * ml_score) + (0.7 * nemotron_adjusted_score)
+        
+        assert abs(result['final_score'] - expected_final) < 0.01, (
+            f"Nemotron adjustment not used in weighted calculation! "
+            f"ML={ml_score}, AI_raw={ai_score_raw}, AI_adjusted={nemotron_adjusted_score}, "
+            f"Expected: 0.3*{ml_score} + 0.7*{nemotron_adjusted_score} = {expected_final:.2f}, "
+            f"Got: {result['final_score']:.2f}"
+        )
+        
+        # Verify Nemotron verification details are included
+        assert 'nemotron_verification' in result, (
+            "Nemotron verification details missing from result"
+        )
+        
+        assert result['nemotron_verification'] == nemotron_verification, (
+            "Nemotron verification details not correctly passed through"
+        )
     
     # Verify the AI score in result is the adjusted one
-    assert result['ai_score'] == nemotron_adjusted_score, (
-        f"AI score should be Nemotron-adjusted ({nemotron_adjusted_score}), "
-        f"got {result['ai_score']}"
-    )
+    if ml_score >= 20:
+        assert result['ai_score'] == nemotron_adjusted_score, (
+            f"AI score should be Nemotron-adjusted ({nemotron_adjusted_score}), "
+            f"got {result['ai_score']}"
+        )
 
 
 # ============================================================================
@@ -435,8 +453,8 @@ async def test_property_6_metadata_consistency(ml_score, ai_score):
     
     This ensures transparency and auditability of scoring decisions.
     """
-    # Skip cases where both scores are None
-    if ml_score is None and ai_score is None:
+    # Skip cases where both scores are None or ml_score < 20 (which forces ml_only)
+    if (ml_score is None and ai_score is None) or (ml_score is not None and ml_score < 20):
         assume(False)
     
     # Create mock risk engine
@@ -485,9 +503,14 @@ async def test_property_6_metadata_consistency(ml_score, ai_score):
     
     # 4. scoring_method must match actual score availability
     if ml_score is not None and ai_score is not None:
-        assert result['scoring_method'] == 'weighted', (
-            f"Both scores available, expected 'weighted', got '{result['scoring_method']}'"
-        )
+        if ml_score < 20:
+            assert result['scoring_method'] == 'ml_only', (
+                f"ml_score < 20 triggers skip optimization, expected 'ml_only', got '{result['scoring_method']}'"
+            )
+        else:
+            assert result['scoring_method'] == 'weighted', (
+                f"Both scores available, expected 'weighted', got '{result['scoring_method']}'"
+            )
     elif ml_score is not None and ai_score is None:
         assert result['scoring_method'] == 'ml_only', (
             f"Only ML available, expected 'ml_only', got '{result['scoring_method']}'"

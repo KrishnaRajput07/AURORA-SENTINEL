@@ -31,10 +31,26 @@ try:
     PRIMARY_PROVIDER = getattr(config, "PRIMARY_VLM_PROVIDER", "qwen2vl_local")
     OLLAMA_MODEL = getattr(config, "OLLAMA_CLOUD_MODEL", "qwen3-vl:235b-cloud")
     QWEN2VL_MODEL = getattr(config, "QWEN2VL_MODEL_ID", "Qwen2-VL")
+    
+    ML_SKIP_AI_THRESHOLD = getattr(config, "ML_SKIP_AI_THRESHOLD", 20)
+    STRUCTURED_PROMPT_THRESHOLD = getattr(config, "STRUCTURED_PROMPT_THRESHOLD", 70)
+    ML_SCORE_WEIGHT = float(getattr(config, "ML_SCORE_WEIGHT", 0.3))
+    AI_SCORE_WEIGHT = float(getattr(config, "AI_SCORE_WEIGHT", 0.7))
+    AI_TOTAL_TIMEOUT = float(getattr(config, "AI_TOTAL_TIMEOUT", 5.0))
+    QWEN_TIMEOUT = float(getattr(config, "QWEN_TIMEOUT", 2.0))
+    NEMOTRON_TIMEOUT = float(getattr(config, "NEMOTRON_TIMEOUT", 3.0))
 except ImportError:
     PRIMARY_PROVIDER = "qwen2vl_local"
     OLLAMA_MODEL = "qwen3-vl:235b-cloud"
     QWEN2VL_MODEL = "Qwen2-VL"
+    
+    ML_SKIP_AI_THRESHOLD = 20
+    STRUCTURED_PROMPT_THRESHOLD = 70
+    ML_SCORE_WEIGHT = 0.3
+    AI_SCORE_WEIGHT = 0.7
+    AI_TOTAL_TIMEOUT = 5.0
+    QWEN_TIMEOUT = 2.0
+    NEMOTRON_TIMEOUT = 3.0
 
 
 def init_qwen2vl():
@@ -154,7 +170,7 @@ def analyze_with_qwen2vl(image, ml_score, ml_factors):
         logger.info("[Qwen2-VL] Analyzing image...")
         
         # Create prompt based on ML score
-        if ml_score > 70:
+        if ml_score > STRUCTURED_PROMPT_THRESHOLD:
             prompt = """Analyze this image for violence or fighting in a PUBLIC SURVEILLANCE context.
 
 Classify as ONE of these categories:
@@ -276,7 +292,7 @@ def analyze_with_ollama(image, ml_score, ml_factors):
         img_bytes = img_byte_arr.getvalue()
         
         # Create prompt
-        if ml_score > 70:
+        if ml_score > STRUCTURED_PROMPT_THRESHOLD:
             prompt = """Analyze this image for violence or fighting in a PUBLIC SURVEILLANCE context.
 
 Classify as ONE of these categories:
@@ -535,7 +551,7 @@ def analyze_image(image_data, ml_score, ml_factors, camera_id):
     
     # Start total timer (Requirement 7.3: 5 second total timeout)
     total_start_time = time.time()
-    TOTAL_TIMEOUT = 5.0  # seconds
+    TOTAL_TIMEOUT = AI_TOTAL_TIMEOUT  # seconds
     
     # Track errors for reporting (Requirement 6.5)
     error_details = {}
@@ -553,7 +569,7 @@ def analyze_image(image_data, ml_score, ml_factors, camera_id):
         logger.warning("ML score was None, defaulting to 0")
     
     # Skip analysis for very low scores (Requirement 7.6)
-    if ml_score < 20:
+    if ml_score < ML_SKIP_AI_THRESHOLD:
         latency_metrics['total_ms'] = int((time.time() - total_start_time) * 1000)
         return {
             'aiScore': ml_score,
@@ -587,7 +603,7 @@ def analyze_image(image_data, ml_score, ml_factors, camera_id):
             
         if result:
             ai_score_raw = result['aiScore']
-            final_score = int(0.3 * ml_score + 0.7 * result['aiScore'])
+            final_score = int(ML_SCORE_WEIGHT * ml_score + AI_SCORE_WEIGHT * result['aiScore'])
             result['aiScore'] = final_score
             result['weighted'] = True
             result['ml_score'] = ml_score
@@ -606,7 +622,7 @@ def analyze_image(image_data, ml_score, ml_factors, camera_id):
     # Secondary or Primary is Qwen2-VL
     logger.info(f"Trying Local Provider ({QWEN2VL_MODEL})...")
     qwen_start_time = time.time()
-    qwen_timeout = min(2.0, TOTAL_TIMEOUT - (time.time() - total_start_time))
+    qwen_timeout = min(QWEN_TIMEOUT, TOTAL_TIMEOUT - (time.time() - total_start_time))
     
     result = analyze_with_qwen2vl(image, ml_score, ml_factors)
     qwen_latency = time.time() - qwen_start_time
@@ -643,7 +659,7 @@ def analyze_image(image_data, ml_score, ml_factors, camera_id):
                     nemotron_start = time.time()
                     
                     # Requirement 7.2: Target 3 seconds for Nemotron
-                    nemotron_timeout = min(3.0, remaining_time)
+                    nemotron_timeout = min(NEMOTRON_TIMEOUT, remaining_time)
                     
                     nemotron_verification = nemotron.verify_analysis(
                         image=image,
@@ -690,7 +706,7 @@ def analyze_image(image_data, ml_score, ml_factors, camera_id):
         
         # Always use weighted scoring: 30% ML + 70% AI
         ai_score_raw = result['aiScore']
-        final_score = int(0.3 * ml_score + 0.7 * result['aiScore'])
+        final_score = int(ML_SCORE_WEIGHT * ml_score + AI_SCORE_WEIGHT * result['aiScore'])
         result['aiScore'] = final_score
         result['weighted'] = True
         result['ml_score'] = ml_score
@@ -748,7 +764,7 @@ def analyze_image(image_data, ml_score, ml_factors, camera_id):
             # Ollama succeeded
             # Always use weighted scoring: 30% ML + 70% AI
             ai_score_raw = result['aiScore']
-            final_score = int(0.3 * ml_score + 0.7 * result['aiScore'])
+            final_score = int(ML_SCORE_WEIGHT * ml_score + AI_SCORE_WEIGHT * result['aiScore'])
             result['aiScore'] = final_score
             result['weighted'] = True
             result['ml_score'] = ml_score

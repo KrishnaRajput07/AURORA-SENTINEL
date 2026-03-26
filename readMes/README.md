@@ -499,9 +499,6 @@ cd ..
 cp .env.example .env
 # Edit .env with your favorite editor
 
-# 6️⃣ Initialize the database
-python apply_migration.py
-
 # 🎉 You're ready to rock!
 ```
 
