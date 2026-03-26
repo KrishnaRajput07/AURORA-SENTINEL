@@ -111,7 +111,17 @@ Thumbs.db
 .idea/
 
 # ========================
-# Hypothesis / Test Cache
+# Path / Environmental Cache
 # ========================
 .hypothesis/
 .pytest_cache/
+
+# ========================
+# Large AI Models
+# ========================
+fir.pt
+vehicle.pt
+wepon.pt
+yolov8s.pt
+yolov8n.pt
+yolov8n-pose.pt

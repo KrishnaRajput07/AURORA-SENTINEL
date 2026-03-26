@@ -65,12 +65,13 @@ class RiskScoringEngine:
         
         # Balanced weights (Sum = 1.0) as per Innovation Spec
         self.weights = {
-            'weapon_detection': 0.45,   # Increased from 0.35
-            'aggressive_posture': 0.35,  # Increased from 0.15
-            'proximity_violation': 0.15, # Increased from 0.10
-            'unattended_object': 0.20,
-            'loitering': 0.15,
-            'crowd_density': 0.10,
+            'weapon_detection': 0.40,   # Adjusted down slightly to accommodate fire
+            'aggressive_posture': 0.30, 
+            'fire_smoke': 0.45,         # High weight for fire/smoke
+            'proximity_violation': 0.15,
+            'unattended_object': 0.15,
+            'loitering': 0.10,
+            'crowd_density': 0.05,
             'contextual': 0.05
         }
         
@@ -256,6 +257,7 @@ class RiskScoringEngine:
             detection_data.get('objects', [])
         )
         factors['aggressive_posture'] = self._analyze_aggression(detection_data['poses'])
+        factors['fire_smoke'] = self._analyze_fire(detection_data.get('fire', []))
         factors['proximity_violation'] = self._check_proximity(detection_data['poses'])
         factors['loitering'] = self._detect_loitering(detection_data['objects'])
         factors['unattended_object'] = self._detect_unattended_objects(detection_data['objects'], detection_data['poses'])
@@ -405,6 +407,26 @@ class RiskScoringEngine:
                         max_conf = max(max_conf, obj_conf * 0.8) # Weight slightly lower than specialized models
                     
         return max_conf
+
+    def _analyze_fire(self, fire_detections):
+        """Analyze fire and smoke for risk impact."""
+        if not fire_detections:
+            return 0.0
+        
+        # We prioritize 'fire' detections over 'smoke'
+        max_fire_conf = 0.0
+        for det in fire_detections:
+            conf = det.get('confidence', 0)
+            if det.get('class') == 'fire':
+                max_fire_conf = max(max_fire_conf, conf)
+            elif det.get('class') == 'smoke':
+                # Smoke has 60% relative impact of fire
+                max_fire_conf = max(max_fire_conf, conf * 0.6)
+            else:
+                # Other classes (unknown) have 40% impact
+                max_fire_conf = max(max_fire_conf, conf * 0.4)
+                
+        return max_fire_conf
 
     def _update_history(self, poses):
         """Update movement history for tracked persons"""
