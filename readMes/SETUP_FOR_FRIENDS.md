@@ -1,4 +1,4 @@
-﻿# 👋 Hey! Want to Run AURORA on Your Machine?
+# 👋 Hey! Want to Run AURORA on Your Machine?
 
 This guide is simple and updated for the current codebase.
 
