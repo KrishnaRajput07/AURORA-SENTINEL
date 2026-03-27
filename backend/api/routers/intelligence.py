@@ -11,6 +11,7 @@ from backend.services.chat_session_store import InMemoryChatSessionStore
 from backend.services.offline_processor import offline_processor
 from backend.services.search_service import search_service
 from backend.services.vlm_service import vlm_service
+from backend.services.agent_service import agent_service
 
 try:
     import config
@@ -69,6 +70,29 @@ def _extract_timestamp_hint(question: str, duration_seconds: Optional[float] = N
     if any(x in q for x in ["end", "ending", "final", "last part"]):
         if duration_seconds is not None and duration_seconds > 1:
             return float(max(0.0, duration_seconds - 1.0))
+    return None
+
+
+def _extract_time_range(question: str) -> Optional[tuple]:
+    """Extracts (start, end) tuple from natural language time-range queries."""
+    q = (question or "").lower()
+    
+    # "from 80s to 120s" / "from 80 to 120 seconds" / "80s-120s"
+    m = re.search(
+        r"\b(\d+)\s*(?:s|sec|secs|second|seconds)?\s*(?:to|-|through)\s*(\d+)\s*(?:s|sec|secs|second|seconds)?\b",
+        q,
+    )
+    if m:
+        return float(m.group(1)), float(m.group(2))
+    
+    # "between 80 and 120 seconds"
+    m = re.search(
+        r"between\s+(\d+)\s*(?:s|sec|secs|second|seconds)?\s+and\s+(\d+)\s*(?:s|sec|secs|second|seconds)?\b",
+        q,
+    )
+    if m:
+        return float(m.group(1)), float(m.group(2))
+    
     return None
 
 
@@ -350,37 +374,40 @@ async def intelligence_chat(req: SearchChatRequest):
         context_lines = _timeline_to_context_lines(timeline_events)
         timeline_payload = _timeline_payload(timeline_events)
 
+        # Check for time-range queries (benefits both agent and deterministic paths)
+        time_range = _extract_time_range(req.question)
+
         enable_agent = bool(getattr(config, "ENABLE_AGENT_CHAT", False)) if config else False
         if enable_agent:
+            # Full Agent Tool Loop path (Option B)
+            agent_result = await agent_service.run(
+                question=req.question,
+                filename=req.filename,
+                history=chat_history
+            )
+            
+            answer = agent_result.get("answer", "")
+            confidence = agent_result.get("confidence", 0.0)
+            provider = agent_result.get("provider", "agent")
+            used_sources = agent_result.get("used_sources", [])
             answer_mode = "agent_tool_loop"
-            if context_lines:
-                result = vlm_service.answer_with_context(
-                    question=req.question,
-                    context_blocks=context_lines,
-                    history=chat_history,
-                )
-                answer = result.get("answer", "")
-                provider = result.get("provider", "agent")
-                confidence = float(result.get("confidence", 0.6))
-                used_sources.append("timeline_search")
-
-            if _should_visual_fallback(req.question, timeline_events):
-                frame_timestamp = target_timestamp
-                if frame_timestamp is None and timeline_events:
-                    frame_timestamp = float(timeline_events[0].get("timestamp", 0))
-                image_data = _extract_frame_data_uri(video_path, frame_timestamp)
-                if image_data:
-                    visual = await vlm_service.answer_question(image_data, req.question)
-                    visual_answer = visual.get("answer", "")
-                    if visual_answer:
-                        if answer:
-                            answer = f"{answer}\n\nVisual check: {visual_answer}"
-                        else:
-                            answer = visual_answer
-                        provider = visual.get("provider", provider)
-                        confidence = max(confidence, float(visual.get("confidence", 0.0)))
-                        used_sources.append("visual_qa")
         else:
+            # Deterministic path: use range_search if time range detected
+            if time_range and req.filename:
+                start_ts, end_ts = time_range
+                range_events = search_service.range_search(
+                    query=req.question,
+                    filename=req.filename,
+                    start_ts=start_ts,
+                    end_ts=end_ts,
+                    limit=timeline_limit,
+                )
+                if range_events:
+                    timeline_events = range_events
+                    context_lines = _timeline_to_context_lines(range_events)
+                    timeline_payload = _timeline_payload(range_events)
+                    used_sources.append("range_search")
+
             if context_lines:
                 result = vlm_service.answer_with_context(
                     question=req.question,

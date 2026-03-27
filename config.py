@@ -102,3 +102,19 @@ CONFIDENCE_NONE = 0.0            # When neither available
 CHAT_SESSION_TTL_SECONDS = int(os.getenv("CHAT_SESSION_TTL_SECONDS", "1800"))
 CHAT_MAX_TURNS = int(os.getenv("CHAT_MAX_TURNS", "12"))
 CHAT_TIMELINE_LIMIT = int(os.getenv("CHAT_TIMELINE_LIMIT", "5"))
+
+# -------------------------------------------------------------------
+# AGENT SETTINGS
+# -------------------------------------------------------------------
+
+# Agent model and provider (local or cloud)
+# Note: qwen3:4B is chosen as default based on user's local inventory.
+AGENT_MODEL = os.getenv("AGENT_MODEL", "qwen3:4B")
+AGENT_PROVIDER = os.getenv("AGENT_PROVIDER", "ollama_local")
+
+# Agent logic constraints
+AGENT_MAX_TOOL_CALLS = int(os.getenv("AGENT_MAX_TOOL_CALLS", "3"))
+AGENT_TEMPERATURE = float(os.getenv("AGENT_TEMPERATURE", "0.1"))
+
+# Search constraints for counting tools
+COUNT_SEARCH_LIMIT = int(os.getenv("COUNT_SEARCH_LIMIT", "500"))

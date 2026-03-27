@@ -388,6 +388,125 @@ class SearchService:
         ranked.sort(key=lambda x: x["score"], reverse=True)
         return selected_name, ranked[: max(1, int(limit))]
 
+    def range_search(
+        self,
+        query: str,
+        filename: str,
+        start_ts: float,
+        end_ts: float,
+        limit: int = 5,
+    ) -> List[dict]:
+        """
+        Retreives events within a specific [start_ts, end_ts] window.
+        Uses the same hybrid scoring as timeline_search but prioritizes the range.
+        """
+        record = self.get_video_record(filename)
+        if not record:
+            return []
+
+        events = record.get("events", []) or []
+        if not events:
+            return []
+
+        # 1. Get semantic hits for the specific file
+        semantic_hits = self.search(query=query, n_results=50, filename=filename)
+        semantic_map: Dict[float, float] = {}
+        for hit in semantic_hits:
+            ts = round(_safe_float(hit.get("metadata", {}).get("timestamp", 0.0)), 2)
+            semantic_map[ts] = max(semantic_map.get(ts, 0.0), _safe_float(hit.get("score", 0.0)))
+
+        q_terms = [t for t in re.findall(r"[a-zA-Z0-9]+", (query or "").lower()) if len(t) > 2]
+
+        ranked = []
+        for evt in events:
+            ts = round(_safe_float(evt.get("timestamp", 0.0)), 2)
+            
+            # Range filter
+            if not (start_ts <= ts <= end_ts):
+                continue
+
+            desc = evt.get("description", "") or ""
+            lower_desc = desc.lower()
+
+            lexical_score = 0.0
+            if q_terms:
+                lexical_hits = sum(1 for term in q_terms if term in lower_desc)
+                lexical_score = lexical_hits / max(3, len(q_terms))
+
+            semantic_score = semantic_map.get(ts, 0.0)
+            
+            # Since it's in range, temporal score is max (1.0)
+            temporal_score = 1.0
+
+            blended = (0.55 * semantic_score) + (0.25 * lexical_score) + (0.20 * temporal_score)
+            ranked.append(
+                {
+                    "timestamp": ts,
+                    "description": desc,
+                    "severity": evt.get("severity", "low"),
+                    "provider": evt.get("provider", "unknown"),
+                    "confidence": _safe_float(evt.get("confidence", 0.0)),
+                    "score": round(blended, 4),
+                }
+            )
+
+        ranked.sort(key=lambda x: x["score"], reverse=True)
+        return ranked[: max(1, int(limit))]
+
+    def count_matching(self, query: str, severity: Optional[str] = None) -> dict:
+        """
+        Approximate global counting via vector search.
+        Scans top-K results and groups by filename.
+        """
+        try:
+            import config
+            limit = getattr(config, "COUNT_SEARCH_LIMIT", 500)
+        except ImportError:
+            limit = 500
+
+        hits = self.search(query=query, n_results=limit, filename=None)
+        if not hits:
+            return {"total_videos": 0, "total_events": 0, "videos": []}
+
+        wanted_severity = (severity or "").strip().lower()
+        grouped: Dict[str, dict] = {}
+        total_events = 0
+
+        for hit in hits:
+            meta = hit.get("metadata", {})
+            filename = _normalize_filename(meta.get("filename"))
+            if not filename:
+                continue
+
+            hit_severity = str(meta.get("severity", "low")).lower()
+            if wanted_severity and hit_severity != wanted_severity:
+                continue
+
+            total_events += 1
+            group = grouped.setdefault(
+                filename,
+                {
+                    "filename": filename,
+                    "event_count": 0,
+                    "best_score": 0.0,
+                    "best_match": "",
+                },
+            )
+            group["event_count"] += 1
+            score = _safe_float(hit.get("score"), 0.0)
+            if score > group["best_score"]:
+                group["best_score"] = score
+                group["best_match"] = hit.get("description", "")
+
+        results = list(grouped.values())
+        results.sort(key=lambda x: x["event_count"], reverse=True)
+
+        return {
+            "total_videos": len(results),
+            "total_events": total_events,
+            "videos": results[:20],  # Return top 20 videos by count
+        }
+
     def cross_video_search(self, query: str, limit: int = 5, severity: Optional[str] = None):
         """
         Returns semantic matches grouped by filename.
