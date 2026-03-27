@@ -122,17 +122,23 @@ class VLMService:
                 numeric_risk = 40
 
         if not prompt:
-            if "causal_fall" in risk_str:
-                prompt = (
-                    "EXAMINE: A person is on the ground. Is this an accidental slip/fall, "
-                    "or did the other person push/shove them? Analyze the interaction logic."
-                )
-            elif numeric_risk >= 85:
-                prompt = "CRITICAL: Describe the violence/weapon. Differentiate sport from real threat."
-            elif numeric_risk >= 40:
-                prompt = "AUDIT: Analyze behavior. Is this a threat, prank, or organized sport?"
-            else:
-                prompt = "SANITY CHECK: Verify if this scene is safe. Look for hidden threats."
+            # Use enhanced contextual prompts
+            try:
+                from backend.services.enhanced_vlm_prompts import build_contextual_prompts
+                prompt = build_contextual_prompts(numeric_risk, risk_str)
+            except ImportError:
+                # Fallback to original prompts
+                if "causal_fall" in risk_str:
+                    prompt = (
+                        "EXAMINE: A person is on the ground. Is this an accidental slip/fall, "
+                        "or did the other person push/shove them? Analyze the interaction logic."
+                    )
+                elif numeric_risk >= 85:
+                    prompt = "CRITICAL: Describe the violence/weapon. Differentiate sport from real threat."
+                elif numeric_risk >= 40:
+                    prompt = "AUDIT: Analyze behavior. Is this a threat, prank, or organized sport?"
+                else:
+                    prompt = "SANITY CHECK: Verify if this scene is safe. Look for hidden threats."
 
         providers = [
             ("ollama", self.ollama.analyze),
@@ -141,6 +147,7 @@ class VLMService:
 
         for provider_name, fn in providers:
             if fn is None:
+                print(f"[VLM] ⚠️ {provider_name} provider is None (not configured), skipping...")
                 continue
             try:
                 print(f"[VLM] Trying {provider_name}...")
@@ -165,11 +172,19 @@ class VLMService:
                     if nemotron_verification:
                         payload["nemotron_verification"] = nemotron_verification
                     return payload
+                else:
+                    # EXPLICIT FALLBACK LOGGING
+                    print(f"[VLM] ❌ {provider_name} returned error: {result}")
+                    print(f"[VLM] ⚠️ FALLBACK: Switching to next provider...")
             except Exception as e:
-                print(f"[VLM] {provider_name} failed: {e}")
+                print(f"[VLM] ❌ {provider_name} failed with exception: {e}")
+                print(f"[VLM] ⚠️ FALLBACK: Switching to next provider...")
 
         latency = time.time() - start
         self.provider_name = "none"
+        # ALL PROVIDERS FAILED - EXPLICIT LOG
+        print(f"[VLM] 🚨 ALL PROVIDERS FAILED! Falling back to ML-only analysis.")
+        print(f"[VLM] 🚨 This means Ollama cloud model may not be reachable. Check your OLLAMA_HOST or API key.")
         return {
             "provider": "none",
             "description": "No VLM providers available. ML-only analysis active.",

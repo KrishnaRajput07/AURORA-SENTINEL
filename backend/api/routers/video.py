@@ -288,9 +288,10 @@ async def process_video_file_task(video_path: str, context_params: dict = None):
             top_factors = peak_alert.get('top_factors', [])
             
             # Innovation #33: Struct-Before-ML (Priority VQA)
-            if vlm_service.chartqa.available:
+            chartqa = getattr(vlm_service, 'chartqa', None)
+            if chartqa and getattr(chartqa, 'available', False):
                 print(f"  [CORTEX STRUCT] Running ChartQA on peak frame...")
-                struct_res = vlm_service.chartqa.analyze(pil_img, "What is the primary activity in this security footage?")
+                struct_res = chartqa.analyze(pil_img, "What is the primary activity in this security footage?")
                 if struct_res and "Error" not in struct_res:
                     vlm_forensic_description = f"STRUCTURAL ANALYST: {struct_res}. "
             

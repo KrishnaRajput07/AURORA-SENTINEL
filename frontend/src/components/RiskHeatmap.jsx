@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Circle, Popup, Marker, useMap } from 'react-leaflet';
 import { Box, Typography, useTheme, alpha, IconButton } from '@mui/material';
-import { Maximize2, Navigation, Layers } from 'lucide-react';
+import { Maximize2, Navigation } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 

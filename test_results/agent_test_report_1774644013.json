@@ -1,0 +1,78 @@
+{
+  "summary": {
+    "total_tests": 6,
+    "passed": 2,
+    "failed": 4,
+    "pass_rate": 33.33333333333333,
+    "timestamp": 1774644013.0938258
+  },
+  "test_results": [
+    {
+      "test_name": "tool_registration",
+      "passed": true,
+      "details": "Registered: {'cross_video_search', 'count_events', 'get_video_info', 'visual_qa', 'timeline_search'}",
+      "timestamp": 1774643991.8304174,
+      "metrics": {}
+    },
+    {
+      "test_name": "single_tool_calls",
+      "passed": true,
+      "details": "Tested 3 tools",
+      "timestamp": 1774643996.184032,
+      "metrics": {}
+    },
+    {
+      "test_name": "orchestration_4766",
+      "passed": false,
+      "details": "Duration: 3.40s | Tools: ['timeline_search'] | Expected tools: ['timeline_search', 'count_events']",
+      "timestamp": 1774643999.585139,
+      "metrics": {
+        "duration": 3.401005744934082,
+        "confidence": 0.85,
+        "tools_called": 1,
+        "answer_length": 178
+      }
+    },
+    {
+      "test_name": "orchestration_6676",
+      "passed": false,
+      "details": "Duration: 8.90s | Tools: ['timeline_search', 'count_events'] | Expected tools: ['cross_video_search', 'count_events']",
+      "timestamp": 1774644008.4883757,
+      "metrics": {
+        "duration": 8.903162479400635,
+        "confidence": 0.85,
+        "tools_called": 2,
+        "answer_length": 1321
+      }
+    },
+    {
+      "test_name": "orchestration_9083",
+      "passed": false,
+      "details": "Duration: 2.57s | Tools: [] | Expected tools: ['timeline_search']",
+      "timestamp": 1774644011.0632565,
+      "metrics": {
+        "duration": 2.5747904777526855,
+        "confidence": 0.85,
+        "tools_called": 0,
+        "answer_length": 160
+      }
+    },
+    {
+      "test_name": "orchestration_8884",
+      "passed": false,
+      "details": "Duration: 2.03s | Tools: [] | Expected tools: ['get_video_info', 'timeline_search']",
+      "timestamp": 1774644013.09372,
+      "metrics": {
+        "duration": 2.030365467071533,
+        "confidence": 0.85,
+        "tools_called": 0,
+        "answer_length": 96
+      }
+    }
+  ],
+  "environment": {
+    "agent_model": "kimi-k2.5:cloud",
+    "context_video": "fight_0257.mpeg",
+    "ollama_available": true
+  }
+}

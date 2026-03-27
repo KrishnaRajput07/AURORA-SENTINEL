@@ -38,6 +38,7 @@ requests
 tqdm
 google-generativeai
 ollama
+groq
 transformers>=4.40.0
 accelerate>=0.30.0
 sentencepiece

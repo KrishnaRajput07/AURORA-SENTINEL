@@ -17,14 +17,14 @@ OLLAMA_CLOUD_MODEL = os.getenv("OLLAMA_CLOUD_MODEL", "qwen3-vl:235b-cloud")
 QWEN2VL_MODEL_ID = os.getenv("QWEN2VL_MODEL_ID", "Qwen/Qwen2-VL-2B-Instruct")
 
 # Whether to enable Nemotron for verification (if time permits)
-ENABLE_NEMOTRON_VERIFICATION = True
+ENABLE_NEMOTRON_VERIFICATION = False
 
 # Whether to load heavy local models (Qwen2-VL, Nemotron) into VRAM on startup.
 # Set to False to save 4-6GB of system RAM when using the cloud!
 PRELOAD_LOCAL_MODELS = False
 
 # Agent-style chat rollout gate (kept off by default)
-ENABLE_AGENT_CHAT = os.getenv("ENABLE_AGENT_CHAT", "false").lower() == "true"
+ENABLE_AGENT_CHAT = os.getenv("ENABLE_AGENT_CHAT", "true").lower() == "true"
 
 # Embedding model used for RAG Vector Database
 EMBEDDING_MODEL_ID = os.getenv("EMBEDDING_MODEL_ID", "all-MiniLM-L6-v2")

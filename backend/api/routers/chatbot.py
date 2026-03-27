@@ -67,9 +67,12 @@ class ChatResponse(BaseModel):
 
 def _groq_chat(system: str, user: str) -> Optional[str]:
     """Call Groq llama-3.1-8b-instant. Returns text or None on failure."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return None
     try:
         from groq import Groq
-        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        client = Groq(api_key=api_key)
         resp = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
@@ -93,10 +96,29 @@ def _gemini_chat(system: str, user: str) -> Optional[str]:
         if not api_key:
             return None
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        # Use stable model name to avoid 404s on v1beta
+        model = genai.GenerativeModel('gemini-1.5-flash')
         return model.generate_content(f"{system}\n\n{user}").text.strip()
     except Exception as e:
         logger.warning(f"Gemini failed: {e}")
+        return None
+
+
+def _ollama_chat(system: str, user: str) -> Optional[str]:
+    """Local Fallback: Ollama."""
+    try:
+        import ollama
+        resp = ollama.chat(
+            model="llama3",
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            options={"temperature": 0.3}
+        )
+        return resp['message']['content'].strip()
+    except Exception as e:
+        logger.warning(f"Ollama failed: {e}")
         return None
 
 
@@ -115,7 +137,10 @@ def llm_format_answer(question: str, tool_resp: ToolResponse, history: List[Chat
         f"Provide a clear, accurate answer."
     )
 
-    return _groq_chat(system, user) or _gemini_chat(system, user) or format_answer_template(tool_resp, question)
+    return (_groq_chat(system, user) or 
+            _gemini_chat(system, user) or 
+            _ollama_chat(system, user) or 
+            format_answer_template(tool_resp, question))
 
 
 def llm_answer_from_video_context(question: str, video_context: str, filename: str) -> str:
@@ -132,8 +157,10 @@ def llm_answer_from_video_context(question: str, video_context: str, filename: s
         f"Question: {question}"
     )
 
-    return (_groq_chat(system, user) or _gemini_chat(system, user)
-            or f"I analyzed **{filename}**. The video contains {len([l for l in video_context.split(chr(10)) if '[' in l])} detected events. Ask me a specific question like 'Was there a fight?' or 'What was the risk level?'")
+    return (_groq_chat(system, user) or 
+            _gemini_chat(system, user) or 
+            _ollama_chat(system, user) or 
+            f"I analyzed **{filename}**. The video contains {len([l for l in video_context.split(chr(10)) if '[' in l])} detected events. Ask me a specific question like 'Was there a fight?' or 'What was the risk level?'")
 
 
 def get_video_context(filename: str) -> Optional[str]:

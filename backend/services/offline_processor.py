@@ -86,41 +86,47 @@ def extract_risk_from_text(text: str, fallback: int = 0) -> int:
     return fallback
 
 
-def build_vlm_prompt(ml_objects: list, ml_weapons: list, prev_description: str = "") -> str:
+def build_vlm_prompt(ml_objects: list, ml_weapons: list, prev_description: str = "", timestamp: float = 0.0) -> str:
     """
-    Build a structured, context-rich prompt for the VLM.
-    Injects ML findings so the VLM can focus on what matters.
+    Build an enhanced, context-rich prompt for detailed forensic VLM analysis.
+    Focus on generating comprehensive, actionable descriptions.
     """
-    ml_context = ""
-    if ml_weapons:
-        weapon_names = ", ".join(set(w.get('sub_class', w.get('class', 'weapon')) for w in ml_weapons))
-        ml_context += f"ML detector flagged: {weapon_names}. "
-    if ml_objects:
-        person_count = sum(1 for o in ml_objects if o.get('class') == 'person')
-        other = [o.get('class') for o in ml_objects if o.get('class') != 'person']
-        if person_count:
-            ml_context += f"{person_count} person(s) detected. "
-        if other:
-            ml_context += f"Other objects: {', '.join(set(other))}. "
+    # Import enhanced prompts if available
+    try:
+        from backend.services.enhanced_vlm_prompts import build_vlm_prompt_enhanced
+        return build_vlm_prompt_enhanced(ml_objects, ml_weapons, prev_description, timestamp)
+    except ImportError:
+        # Fallback to original prompt if enhanced version not available
+        ml_context = ""
+        if ml_weapons:
+            weapon_names = ", ".join(set(w.get('sub_class', w.get('class', 'weapon')) for w in ml_weapons))
+            ml_context += f"ML detector flagged: {weapon_names}. "
+        if ml_objects:
+            person_count = sum(1 for o in ml_objects if o.get('class') == 'person')
+            other = [o.get('class') for o in ml_objects if o.get('class') != 'person']
+            if person_count:
+                ml_context += f"{person_count} person(s) detected. "
+            if other:
+                ml_context += f"Other objects: {', '.join(set(other))}. "
 
-    context_note = ""
-    if prev_description:
-        context_note = f"\nPrevious frame context: {prev_description[:120]}"
+        context_note = ""
+        if prev_description:
+            context_note = f"\nPrevious frame context: {prev_description[:120]}"
 
-    return (
-        f"SURVEILLANCE FORENSIC ANALYSIS{context_note}\n"
-        f"ML pre-scan: {ml_context or 'no specific flags'}\n\n"
-        "Analyze this surveillance frame and answer:\n"
-        "1. What is happening? Describe all human interactions in detail.\n"
-        "2. Is there any violence, aggression, weapons, or threatening behavior? "
-        "Be specific — describe body posture, proximity, and actions.\n"
-        "3. Is this organized sport (boxing/sparring with referee/ring/gloves), "
-        "a prank/staged scene, or a real threat?\n"
-        "4. Provide a RISK SCORE from 0-100 where:\n"
-        "   0-20 = safe/normal, 21-40 = minor concern, 41-60 = suspicious,\n"
-        "   61-80 = high threat, 81-100 = critical/immediate danger\n"
-        "Format your last line as: RISK SCORE: [number]"
-    )
+        return (
+            f"SURVEILLANCE FORENSIC ANALYSIS{context_note}\n"
+            f"ML pre-scan: {ml_context or 'no specific flags'}\n\n"
+            "Analyze this surveillance frame and answer:\n"
+            "1. What is happening? Describe all human interactions in detail.\n"
+            "2. Is there any violence, aggression, weapons, or threatening behavior? "
+            "Be specific — describe body posture, proximity, and actions.\n"
+            "3. Is this organized sport (boxing/sparring with referee/ring/gloves), "
+            "a prank/staged scene, or a real threat?\n"
+            "4. Provide a RISK SCORE from 0-100 where:\n"
+            "   0-20 = safe/normal, 21-40 = minor concern, 41-60 = suspicious,\n"
+            "   61-80 = high threat, 81-100 = critical/immediate danger\n"
+            "Format your last line as: RISK SCORE: [number]"
+        )
 
 
 def compute_motion_score(frame1, frame2) -> float:
@@ -231,7 +237,7 @@ class OfflineProcessor:
                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     pil_img = Image.fromarray(rgb_frame)
 
-                    prompt = build_vlm_prompt(yolo_objects, yolo_weapons, prev_description)
+                    prompt = build_vlm_prompt(yolo_objects, yolo_weapons, prev_description, timestamp)
                     ml_risk_hint = 80 if has_weapons else (60 if is_high_motion and has_people else 30)
 
                     result = vlm_service.analyze_scene(pil_img, prompt, risk_score=ml_risk_hint)

@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
     Box, Typography, Paper, TextField, IconButton, Chip,
-    List, ListItem, ListItemText, ListItemIcon,
-    Divider, alpha, useTheme, CircularProgress,
-    Button, Badge, Avatar, Fade, Tooltip,
+    List, alpha, useTheme, CircularProgress,
+    Button, Avatar, Fade, Tooltip,
     Modal, Backdrop
 } from '@mui/material';
 import {
-    Search, Brain, Play, Clock, AlertTriangle,
-    Activity, Filter, History, Target, ShieldAlert,
+    Search, Brain, Play, Clock,
+    History, Target, ShieldAlert,
     Zap, Mic, Video, X
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';

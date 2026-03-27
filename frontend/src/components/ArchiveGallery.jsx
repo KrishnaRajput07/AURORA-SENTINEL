@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Grid, Card, CardContent, CardMedia, IconButton, Tab, Tabs, alpha, useTheme, Button, CircularProgress, Dialog, Chip } from '@mui/material';
+import { Box, Typography, Grid, Card, CardContent, IconButton, Tab, Tabs, alpha, useTheme, Button, CircularProgress, Dialog } from '@mui/material';
 import { Play, Trash2, Download, FileVideo, Clock, RefreshCw, HardDrive, X, AlertTriangle, MapPin, RefreshCcw as Refresh } from 'lucide-react';
 import { format } from 'date-fns';
 import { API_BASE_URL } from '../config';

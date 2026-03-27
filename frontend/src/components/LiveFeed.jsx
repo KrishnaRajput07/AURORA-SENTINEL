@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Box, Typography, useTheme, alpha, MenuItem, Select, FormControl, Switch, FormControlLabel, Fade } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Box as BoxIcon, RefreshCw, BrainCircuit, Shield, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { User, Box as BoxIcon, RefreshCw, BrainCircuit, ShieldCheck } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { useSettings } from '../context/SettingsContext';
 import { WS_BASE_URL } from '../config';

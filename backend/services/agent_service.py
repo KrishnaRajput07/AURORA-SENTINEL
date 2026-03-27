@@ -33,6 +33,16 @@ class AgentService:
     """
 
     def __init__(self):
+        # Log agent initialization
+        print("[Agent] Initializing Agent Service...")
+        if ollama is None:
+            print("[Agent] ❌ Ollama library not installed - agent will be disabled")
+        else:
+            cfg = _get_agent_config()
+            ollama_host = os.getenv("OLLAMA_HOST", "default (localhost:11434)")
+            print(f"[Agent] ✅ Ollama library available | Host: {ollama_host}")
+            print(f"[Agent] Config: model={cfg['model']}, max_calls={cfg['max_calls']}, temp={cfg['temperature']}")
+        
         # Tool definitions for Ollama — defined once, reused across calls
         
         # Tool definitions for Ollama
@@ -120,7 +130,12 @@ class AgentService:
 
     async def run(self, question: str, filename: Optional[str], history: List[dict]) -> dict:
         """Runs the agentic loop to answer a question."""
+        print(f"[Agent] ========== AGENT RUN STARTED ==========")
+        print(f"[Agent] Question: '{question[:80]}{'...' if len(question) > 80 else ''}'")
+        print(f"[Agent] Filename context: {filename or 'None'}")
+        
         if ollama is None:
+            print("[Agent] ❌ FALLBACK: Ollama library not installed - returning error response")
             return {
                 "answer": "Ollama library not installed. Cannot run agent.",
                 "confidence": 0.0,
@@ -133,6 +148,10 @@ class AgentService:
         model = cfg["model"]
         max_calls = cfg["max_calls"]
         temperature = cfg["temperature"]
+        
+        ollama_host = os.getenv("OLLAMA_HOST", "default (localhost:11434)")
+        print(f"[Agent] Using model: {model} | Host: {ollama_host}")
+        print(f"[Agent] Max iterations: {max_calls} | Temperature: {temperature}")
 
         messages = [
             {
@@ -162,12 +181,14 @@ class AgentService:
             print(f"[Agent] Iteration {iteration+1}/{max_calls} | model={model} | q='{question[:40]}...'")
             
             try:
+                print(f"[Agent] Calling ollama.chat() with {len(messages)} messages...")
                 response = ollama.chat(
                     model=model,
                     messages=messages,
                     tools=self.tools,
                     options={"temperature": temperature}
                 )
+                print(f"[Agent] ✅ Ollama response received from {model}")
                 
                 # Robust access: ollama lib may return object with attrs OR dict
                 if hasattr(response, "message"):
@@ -188,6 +209,7 @@ class AgentService:
                 
                 if not tool_calls:
                     # No more tools needed, we have the final answer
+                    print(f"[Agent] ✅ No tool calls - returning final answer")
                     answer_text = msg_dict.get("content", "")
                     # Strip <think>...</think> blocks from reasoning models
                     import re as _re
@@ -201,6 +223,7 @@ class AgentService:
                     }
                 
                 # Execute tool calls
+                print(f"[Agent] 🔧 Tool calls detected: {len(tool_calls) if tool_calls else 0}")
                 for tool_call in tool_calls:
                     # Handle both dict and object access patterns
                     if hasattr(tool_call, "function"):
@@ -214,6 +237,7 @@ class AgentService:
                     print(f"[Agent] Calling tool: {fn_name}({args})")
                     
                     result = await self._call_tool(fn_name, args, filename)
+                    print(f"[Agent] Tool result: {str(result)[:100]}{'...' if len(str(result)) > 100 else ''}")
                     used_sources.append(fn_name)
                     tools_called.append({"tool": fn_name, "args": args})
                     
@@ -229,7 +253,8 @@ class AgentService:
                     })
                     
             except Exception as e:
-                print(f"[Agent] Error in loop: {e}")
+                print(f"[Agent] ❌ Error in agentic loop: {type(e).__name__}: {e}")
+                print(f"[Agent] ❌ Check if OLLAMA_HOST is correctly configured for cloud model")
                 return {
                     "answer": f"I encountered an error while analyzing the request: {str(e)}",
                     "confidence": 0.0,
@@ -238,6 +263,7 @@ class AgentService:
                 }
                 
         # If we hit max iterations, return the last content
+        print(f"[Agent] ⚠️ Max iterations ({max_calls}) reached - returning best effort answer")
         last_content = msg_dict.get("content", "") if 'msg_dict' in dir() else ""
         return {
             "answer": last_content or "I processed your request but reached the maximum tool-call limit.",
