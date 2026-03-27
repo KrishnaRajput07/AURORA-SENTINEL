@@ -4,7 +4,8 @@ load_dotenv() # MUST BE FIRST
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db.database import engine, Base, ensure_alert_columns
-from backend.api.routers import alerts, analytics, video, stream, archive, stream_vlm, intelligence, settings
+from backend.api.routers import alerts, analytics, video, stream, archive, stream_vlm, intelligence, settings, smart_bin, chatbot
+from backend.services.retention_scheduler import RetentionScheduler
 from backend.services.ml_service import ml_service
 import os
 import shutil
@@ -53,6 +54,8 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # Initialize Models on Startup
+_retention_scheduler = RetentionScheduler()
+
 @app.on_event("startup")
 async def startup_event():
     print("STARTUP: Starting ml_service.load_models()...")
@@ -64,6 +67,8 @@ async def startup_event():
         import traceback
         traceback.print_exc()
         raise e
+    await _retention_scheduler.start()
+    print("STARTUP: RetentionScheduler started.")
 
 # Routers are included below using 'app.include_router'
 
@@ -86,6 +91,10 @@ print("Including intelligence router...")
 app.include_router(intelligence.router, prefix="/intelligence", tags=["Intelligence"]) 
 print("Including settings router...")
 app.include_router(settings.router, prefix="/settings", tags=["Settings"])
+print("Including smart_bin router...")
+app.include_router(smart_bin.router, prefix="/smart-bin", tags=["Smart Bin"])
+print("Including chatbot router...")
+app.include_router(chatbot.router, prefix="/chatbot", tags=["Chatbot"])
 print("All routers included.")
 
 @app.get("/")

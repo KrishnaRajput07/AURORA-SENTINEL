@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Circle, Popup, Marker, useMap } from 'react-leaflet';
-import { Box, Typography, useTheme, alpha } from '@mui/material';
+import { Box, Typography, useTheme, alpha, IconButton } from '@mui/material';
+import { Maximize2, Navigation, Layers } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -29,6 +30,8 @@ const RiskHeatmap = ({ alerts }) => {
     const theme = useTheme();
     const [mapCenter, setMapCenter] = useState([28.5355, 77.3910]); // Default Noida
     const [systemLocation, setSystemLocation] = useState(null);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const mapRef = useRef(null);
 
     useEffect(() => {
         if ("geolocation" in navigator) {
@@ -73,15 +76,43 @@ const RiskHeatmap = ({ alerts }) => {
         return theme.palette.success.main;
     };
 
+    const toggleFullscreen = () => {
+        if (!mapRef.current) return;
+        
+        if (!isFullscreen) {
+            mapRef.current._container.requestFullscreen();
+            setIsFullscreen(true);
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+            setIsFullscreen(false);
+        }
+    };
+
+    const handleZoomIn = () => {
+        if (mapRef.current) {
+            mapRef.current.zoomIn();
+        }
+    };
+
+    const handleZoomOut = () => {
+        if (mapRef.current) {
+            mapRef.current.zoomOut();
+        }
+    };
+
     return (
         <Box sx={{
             height: '100%',
             width: '100%',
             bgcolor: '#F8FAFC',
             position: 'relative',
-            '& .leaflet-container': {
-                fontFamily: 'inherit',
-                background: '#F8FAFC'
+            '&:fullscreen': {
+                '& .map-controls': {
+                    bottom: 20,
+                    right: 20
+                }
             }
         }}>
             <MapContainer
@@ -89,8 +120,10 @@ const RiskHeatmap = ({ alerts }) => {
                 zoom={16}
                 style={{ height: '100%', width: '100%' }}
                 zoomControl={false}
+                ref={mapRef}
             >
                 <ReCenter center={mapCenter} />
+                
                 {/* Clean, high-contrast light tiles */}
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
@@ -115,7 +148,7 @@ const RiskHeatmap = ({ alerts }) => {
                             {risk > 50 && (
                                 <Circle
                                     center={[camera.lat, camera.lng]}
-                                    radius={60}
+                                    radius={isFullscreen ? 80 : 60}
                                     pathOptions={{
                                         fillColor: color,
                                         fillOpacity: 0.1,
@@ -128,20 +161,24 @@ const RiskHeatmap = ({ alerts }) => {
 
                             <Circle
                                 center={[camera.lat, camera.lng]}
-                                radius={risk > 75 ? 45 : 35}
+                                radius={isFullscreen ? risk > 75 ? 60 : 45 : isFullscreen ? 35 : 25}
                                 pathOptions={{
                                     fillColor: color,
-                                    fillOpacity: 0.5,
+                                    fillOpacity: 0.6,
                                     color: color,
                                     weight: 2,
                                 }}
                             >
                                 <Popup closeButton={false} offset={[0, -10]}>
                                     <Box sx={{
-                                        minWidth: 160,
-                                        p: 1.5,
+                                        minWidth: isFullscreen ? 200 : 160,
+                                        p: isFullscreen ? 2 : 1.5,
                                         borderRadius: 2,
-                                        textAlign: 'center'
+                                        textAlign: 'center',
+                                        bgcolor: 'rgba(255,255,255,0.95)',
+                                        backdropFilter: 'blur(12px)',
+                                        border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                                        boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
                                     }}>
                                         <Typography variant="overline" sx={{
                                             fontWeight: 900,
@@ -149,25 +186,42 @@ const RiskHeatmap = ({ alerts }) => {
                                             letterSpacing: '0.1em',
                                             lineHeight: 1,
                                             display: 'block',
-                                            mb: 1
+                                            mb: 0.5,
+                                            fontSize: isFullscreen ? '0.8rem' : '0.7rem'
                                         }}>
                                             ZONE MONITOR
                                         </Typography>
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: theme.palette.text.primary, lineHeight: 1.2 }}>
+                                        <Typography variant="subtitle1" sx={{ 
+                                            fontWeight: 800, 
+                                            color: theme.palette.text.primary, 
+                                            lineHeight: 1.2,
+                                            fontSize: isFullscreen ? '1rem' : '0.85rem'
+                                        }}>
                                             {camera.name}
                                         </Typography>
 
                                         <Box sx={{
-                                            mt: 2,
-                                            pt: 1.5,
+                                            mt: isFullscreen ? 2 : 1.5,
+                                            pt: isFullscreen ? 1.5 : 1,
                                             borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             gap: 1
                                         }}>
-                                            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, boxShadow: `0 0 8px ${color}` }} />
-                                            <Typography variant="h6" sx={{ fontWeight: 900, color: color, fontSize: '1rem', fontFamily: 'monospace' }}>
+                                            <Box sx={{ 
+                                                width: isFullscreen ? 10 : 8, 
+                                                height: isFullscreen ? 10 : 8, 
+                                                borderRadius: '50%', 
+                                                bgcolor: color, 
+                                                boxShadow: `0 0 ${isFullscreen ? 12 : 8}px ${color}` 
+                                            }} />
+                                            <Typography variant="h6" sx={{ 
+                                                fontWeight: 900, 
+                                                color: color, 
+                                                fontSize: isFullscreen ? '1.1rem' : '0.9rem',
+                                                fontFamily: 'monospace'
+                                            }}>
                                                 {risk.toFixed(0)}% RISK
                                             </Typography>
                                         </Box>
@@ -179,9 +233,71 @@ const RiskHeatmap = ({ alerts }) => {
                 })}
             </MapContainer>
 
-            {/* Injected Pulsing CSS */}
-            <style>
-                {`
+            {/* Enhanced Map Controls */}
+            <Box className="map-controls" sx={{
+                position: 'absolute',
+                bottom: 20,
+                right: 20,
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1,
+                transition: 'all 0.3s ease'
+            }}>
+                {/* Zoom Controls */}
+                <Box sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.5,
+                    bgcolor: 'rgba(255,255,255,0.9)',
+                    borderRadius: 2,
+                    p: 0.5,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                }}>
+                    <IconButton
+                        size="small"
+                        onClick={handleZoomIn}
+                        sx={{
+                            color: theme.palette.text.secondary,
+                            '&:hover': { color: theme.palette.primary.main, bgcolor: alpha(theme.palette.primary.main, 0.1) }
+                        }}
+                        title="Zoom In"
+                    >
+                        <Navigation size={16} />
+                    </IconButton>
+                    <IconButton
+                        size="small"
+                        onClick={handleZoomOut}
+                        sx={{
+                            color: theme.palette.text.secondary,
+                            '&:hover': { color: theme.palette.primary.main, bgcolor: alpha(theme.palette.primary.main, 0.1) }
+                        }}
+                        title="Zoom Out"
+                    >
+                        <Navigation size={16} style={{ transform: 'rotate(180deg)' }} />
+                    </IconButton>
+                </Box>
+
+                {/* Fullscreen Toggle */}
+                <IconButton
+                    size="small"
+                    onClick={toggleFullscreen}
+                    sx={{
+                        bgcolor: isFullscreen ? theme.palette.primary.main : 'rgba(255,255,255,0.9)',
+                        color: isFullscreen ? '#fff' : theme.palette.text.secondary,
+                        '&:hover': { 
+                            bgcolor: isFullscreen ? theme.palette.primary.dark : alpha(theme.palette.primary.main, 0.1),
+                            color: '#fff'
+                        }
+                    }}
+                    title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                >
+                    <Maximize2 size={16} />
+                </IconButton>
+            </Box>
+
+            {/* Injected CSS */}
+            <style>{`
                 .pulse-circle {
                     animation: leaflet-pulse 2s infinite ease-out;
                 }
@@ -190,7 +306,7 @@ const RiskHeatmap = ({ alerts }) => {
                     100% { stroke-width: 15; stroke-opacity: 0; fill-opacity: 0; }
                 }
                 .leaflet-popup-content-wrapper {
-                    background: rgba(255, 255, 255, 0.9) !important;
+                    background: rgba(255, 255, 255, 0.95) !important;
                     backdrop-filter: blur(12px) !important;
                     border-radius: 16px !important;
                     box-shadow: 0 12px 32px rgba(0,0,0,0.15) !important;
@@ -198,15 +314,18 @@ const RiskHeatmap = ({ alerts }) => {
                     overflow: hidden !important;
                 }
                 .leaflet-popup-tip {
-                    background: rgba(255, 255, 255, 0.9) !important;
+                    background: rgba(255, 255, 255, 0.95) !important;
                     backdrop-filter: blur(12px) !important;
                 }
                 .leaflet-popup-content {
                     margin: 0 !important;
                     width: auto !important;
                 }
-                `}
-            </style>
+                .leaflet-container {
+                    font-family: inherit !important;
+                    background: #F8FAFC !important;
+                }
+            `}</style>
         </Box>
     );
 };

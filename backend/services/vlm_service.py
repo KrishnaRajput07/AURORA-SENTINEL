@@ -330,10 +330,22 @@ class VLMService:
             "confidence": float(response.get("confidence", 0.5)),
         }
 
+    @staticmethod
+    def _is_negated(text, keyword, window=6):
+        """Return True if `keyword` is preceded by a negation word within `window` words."""
+        negations = {'not', 'no', 'never', 'without', "isn't", "aren't", "doesn't",
+                     "don't", "neither", "nor", 'non', 'nothing', 'nobody'}
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        for m in re.finditer(pattern, text):
+            preceding = text[:m.start()].split()[-window:]
+            if any(neg in preceding for neg in negations):
+                return True
+        return False
+
     def _extract_risk_from_text(self, description, base_risk):
         """
         Extract a risk score from VLM description text using keyword analysis.
-        Applies sport/boxing safety cap when appropriate.
+        Applies negation awareness and sport/boxing safety cap.
         """
         lower_desc = (description or "").lower()
 
@@ -358,13 +370,22 @@ class VLMService:
         risk = float(base_risk)
         for keyword, score in threat_keywords.items():
             if re.search(r"\b" + re.escape(keyword) + r"\b", lower_desc):
-                risk = max(risk, score)
+                if not self._is_negated(lower_desc, keyword):
+                    risk = max(risk, score)
 
+        # Sport/prank override — only if NOT negated
         sport_indicators = ["boxing", "sparring", "referee", "boxing ring", "boxing gloves"]
         danger_indicators = ["street fight", "unauthorized", "assault", "ambush"]
-        if any(s in lower_desc for s in sport_indicators):
-            if all(d not in lower_desc for d in danger_indicators):
-                risk = min(risk, SPORT_RISK_CAP)
+        is_sport = any(
+            kw in lower_desc and not self._is_negated(lower_desc, kw)
+            for kw in sport_indicators
+        )
+        is_real_fight = any(
+            kw in lower_desc and not self._is_negated(lower_desc, kw)
+            for kw in danger_indicators
+        )
+        if is_sport and not is_real_fight:
+            risk = min(risk, SPORT_RISK_CAP)
 
         return risk
 

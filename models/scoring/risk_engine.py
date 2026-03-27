@@ -426,15 +426,15 @@ class RiskScoringEngine:
         if weapons:
             max_conf = max([w['confidence'] for w in weapons])
             
-        # 2. Check Standard Model Detections (Knives, Bats)
+        # 2. Check Standard Model Detections (Knives, Bats, Scissors)
         if objects:
             weapon_types = ['knife', 'baseball bat', 'scissors']
             for obj in objects:
                 if obj.get('class') in weapon_types:
-                    # For standard objects, we require higher confidence or contextual support
                     obj_conf = obj.get('confidence', 0)
-                    if obj_conf > 0.65: # Hardened: Ignore bananas (~40-50% knife/gun conf)
-                        max_conf = max(max_conf, obj_conf * 0.8) # Weight slightly lower than specialized models
+                    if obj_conf > 0.45:  # Lower threshold — knives/scissors are real threats
+                        # No multiplier penalty: treat COCO knife/scissors at full confidence
+                        max_conf = max(max_conf, obj_conf)
                     
         return max_conf
 
