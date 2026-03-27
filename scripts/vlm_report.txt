@@ -1,0 +1,57 @@
+
+================================================================
+  1. CONFIG AUDIT  (all files that touch PRIMARY_VLM_PROVIDER / OLLAMA_CLOUD_MODEL)
+================================================================
+  [INFO] Env PRIMARY_VLM_PROVIDER = <NOT SET>
+  [INFO] Env OLLAMA_CLOUD_MODEL   = <NOT SET>
+  [OK]   config.py  PRIMARY_VLM_PROVIDER = ollama_cloud
+  [OK]   config.py  OLLAMA_CLOUD_MODEL   = qwen3-vl:235b-cloud
+  [INFO] aiRouter_enhanced.py will see PRIMARY_PROVIDER = ollama_cloud
+  [INFO] aiRouter_enhanced.py will see OLLAMA_MODEL     = qwen3-vl:235b-cloud
+  [OK]   PRIMARY_PROVIDER = 'ollama_cloud'  ->  Ollama IS the intended primary VLM
+  [OK]   Model tag is correct: qwen3-vl:235b-cloud
+
+================================================================
+  2. OLLAMA SERVICE CHECK
+================================================================
+  [FAIL] ollama Python package NOT installed  ->  pip install ollama
+
+================================================================
+  3. LIVE CALL  ->  ollama.chat(model='qwen3-vl:235b-cloud')
+================================================================
+  [OK]   Synthetic test image created (100x100 grey frame)
+  [FAIL] Skipping live call -- ollama package not installed
+
+================================================================
+  4. RESPONSE ANALYSIS
+================================================================
+  [WARN] No response to analyse
+
+================================================================
+  5. FALLBACK CHAIN TRACE  (analyze_image() in aiRouter_enhanced.py:528)
+================================================================
+
+  Step 1: PRIMARY_PROVIDER == 'ollama_cloud'?
+  [OK]     YES  -> system calls analyze_with_ollama() first
+
+  Step 2: analyze_with_ollama() succeeds?
+  [FAIL]   NO   -> ollama package not installed
+  [WARN]   System logs 'Primary Ollama failed, falling back to Local (Qwen2-VL)'
+
+  Step 3: analyze_with_qwen2vl() available?
+  [FAIL]   qwen2vl_integration not importable -> Qwen2-VL would also fail
+
+  Step 4: fallback_analysis() -> uses raw ML score (confidence=0.3)
+  [WARN]   FULL FALLBACK: no VLM is running -- ML-only scoring active
+
+================================================================
+  6. FINAL VERDICT
+================================================================
+
+  [CRIT]  CRITICAL: Both Ollama AND Qwen2-VL are unavailable.
+
+  System is running on ML-only scoring (confidence=0.3).
+    AI scene understanding is COMPLETELY DISABLED.
+
+  Action items:
+  -> Start Ollama service:  ollama serve

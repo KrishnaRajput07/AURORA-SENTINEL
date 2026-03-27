@@ -1,0 +1,62 @@
+﻿
+[1m[96m============================================================[0m
+[1m[97m  1. CONFIG AUDIT[0m
+[1m[96m============================================================[0m
+python : Traceback 
+(most recent call last):
+At line:1 char:1
++ python scripts/vlm_dia
+gnostic.py 2>&1 | 
+Out-File -FilePath 
+scripts/vl ...
++ ~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
+    + CategoryInfo      
+        : NotSpecified  
+  : (Traceback (most    
+ recent call last)::    
+String) [], RemoteE    
+xception
+    + FullyQualifiedErr 
+   orId : NativeComman  
+  dError
+ 
+  File "C:\Users\alone\O
+neDrive\Desktop\hackapro
+ject\AURORA-SENTINEL\scr
+ipts\vlm_diagnostic.py",
+ line 51, in <module>
+    info(f"Env  
+PRIMARY_VLM_PROVIDER = {
+BOLD}{env_provider}{RESE
+T}")
+    ~~~~^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\alone\O
+neDrive\Desktop\hackapro
+ject\AURORA-SENTINEL\scr
+ipts\vlm_diagnostic.py",
+ line 36, in info
+    def 
+info(text):print(f"  
+{CYAN}\u2139\ufe0f   
+{text}{RESET}")
+                   ~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^
+  File "C:\Users\alone\a
+naconda3\Lib\encodings\c
+p1252.py", line 19, in 
+encode
+    return codecs.charma
+p_encode(input,self.erro
+rs,encoding_table)[0]
+           ~~~~~~~~~~~~~
+~~~~~~~~^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 
+'charmap' codec can't 
+encode characters in 
+position 7-8: character 
+maps to <undefined>
