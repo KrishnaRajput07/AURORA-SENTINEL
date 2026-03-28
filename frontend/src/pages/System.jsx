@@ -6,6 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { API_BASE_URL } from '../config';
+import SmartBinSettings from '../components/SmartBinSettings';
 
 const SystemPage = () => {
     const [tabIndex, setTabIndex] = useState(0);
@@ -102,6 +103,9 @@ const SystemPage = () => {
                         </Button>
                     </Box>
                 </Paper>
+            </Grid>
+            <Grid item xs={12}>
+                <SmartBinSettings />
             </Grid>
         </Grid>
     );

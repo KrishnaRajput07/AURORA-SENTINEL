@@ -2,8 +2,11 @@ import os
 import cv2
 import time
 import shutil
+import subprocess
+import tempfile
 from datetime import datetime, timedelta
 import threading
+
 
 # 3 dirname calls: video_storage_service.py → services/ → backend/ → project root
 _PROJECT_ROOT = os.path.dirname(
@@ -11,6 +14,12 @@ _PROJECT_ROOT = os.path.dirname(
         os.path.dirname(os.path.abspath(__file__))
     )
 )
+
+
+class VideoSegmentNotFoundError(Exception):
+    """Raised when a video segment cannot be retrieved for the given camera and time range."""
+    pass
+
 
 class Recording:
     def __init__(self, writer, path, start_time):
@@ -65,8 +74,10 @@ class VideoStorageService:
         recording.last_frame_time = time.time()
         
         # Auto-stop after 30 seconds of recording to chunk files
+        # But ensure minimum 5 seconds to get meaningful content
         if time.time() - recording.start_time > 30:
             self.stop_recording(camera_id)
+            print(f"Auto-stopped recording for {camera_id} after 30s chunk")
 
     def stop_recording(self, camera_id):
         with self.recordings_lock:
@@ -75,6 +86,18 @@ class VideoStorageService:
             return
 
         recording.writer.release()
+        
+        # Verify the file was written properly
+        try:
+            file_size = os.path.getsize(recording.path)
+            if file_size < 1000:  # Less than 1KB means likely corrupted
+                print(f"WARNING: Recording file too small ({file_size} bytes), removing: {recording.path}")
+                os.remove(recording.path)
+            else:
+                print(f"Successfully stopped recording for {camera_id}: {recording.path} ({file_size} bytes)")
+        except OSError as e:
+            print(f"Error checking recording file {recording.path}: {e}")
+        
         print(f"Stopped recording for {camera_id}")
 
     def is_recording(self, camera_id):
@@ -123,5 +146,106 @@ class VideoStorageService:
             if now - mtime > timedelta(days=self.bin_retention_days):
                 print(f"Deleting expired clip from bin: {f}")
                 os.remove(file_path)
+
+    def get_segment(self, camera_id: str, end_time: datetime, duration_seconds: int) -> bytes:
+        """
+        Retrieve `duration_seconds` of video ending at `end_time` for `camera_id`.
+        Returns raw MP4 bytes encoded as H.264 for browser compatibility.
+        Raises VideoSegmentNotFoundError on failure.
+        """
+        # Find completed (closed) recording files for this camera.
+        # Skip any file that is currently open for writing (moov atom not finalized).
+        active_paths = {
+            rec.path for rec in self.active_recordings.values()
+        }
+
+        try:
+            candidates = [
+                f for f in os.listdir(self.clips_path)
+                if f.startswith(camera_id) and f.endswith(".mp4")
+                and os.path.join(self.clips_path, f) not in active_paths
+            ]
+        except OSError as e:
+            raise VideoSegmentNotFoundError(
+                f"Could not list recordings for camera '{camera_id}': {e}"
+            ) from e
+
+        if not candidates:
+            raise VideoSegmentNotFoundError(
+                f"No completed recording files found for camera '{camera_id}'. "
+                f"The current recording chunk may still be open."
+            )
+
+        # Pick the most recently modified completed file
+        candidates.sort(
+            key=lambda f: os.path.getmtime(os.path.join(self.clips_path, f)),
+            reverse=True,
+        )
+        source_path = os.path.join(self.clips_path, candidates[0])
+
+        # Get actual file duration via ffprobe
+        try:
+            probe = subprocess.run(
+                [
+                    "ffprobe", "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    source_path,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=10,
+            )
+            file_duration = float(probe.stdout.decode().strip())
+        except Exception:
+            file_duration = 30.0  # fallback
+
+        start_offset = max(0.0, file_duration - duration_seconds)
+
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-ss", str(start_offset),
+                "-i", source_path,
+                "-t", str(duration_seconds),
+                "-vcodec", "libx264",          # H.264 for browser compatibility
+                "-acodec", "aac",
+                "-preset", "ultrafast",
+                "-movflags", "frag_keyframe+empty_moov+faststart",
+                tmp_path,
+            ]
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=60,
+            )
+            if result.returncode != 0:
+                raise VideoSegmentNotFoundError(
+                    f"FFmpeg failed for camera '{camera_id}' "
+                    f"(exit {result.returncode}): {result.stderr.decode(errors='replace')}"
+                )
+
+            with open(tmp_path, "rb") as f:
+                return f.read()
+
+        except subprocess.TimeoutExpired as e:
+            raise VideoSegmentNotFoundError(
+                f"FFmpeg timed out for camera '{camera_id}'"
+            ) from e
+        except FileNotFoundError as e:
+            raise VideoSegmentNotFoundError(
+                f"FFmpeg executable not found: {e}"
+            ) from e
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
 
 video_storage_service = VideoStorageService()

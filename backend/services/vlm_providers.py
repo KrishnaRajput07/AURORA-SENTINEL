@@ -116,7 +116,12 @@ class OllamaProvider(VLMProvider):
 
     def analyze(self, image, prompt):
         if ollama is None:
+            print("[VLM] ❌ Ollama library not installed")
             return "Error: Ollama not installed"
+
+        # Log the model being used for debugging
+        ollama_host = os.getenv("OLLAMA_HOST", "default (localhost:11434)")
+        print(f"[VLM] Calling Ollama model: {self.model_name} | Host: {ollama_host}")
 
         try:
             img_byte_arr = io.BytesIO()
@@ -128,9 +133,11 @@ class OllamaProvider(VLMProvider):
                 keep_alive=-1,
                 messages=[{'role': 'user', 'content': prompt, 'images': [img_bytes]}]
             )
+            print(f"[VLM] ✅ Ollama response received from {self.model_name}")
             return response['message']['content']
         except Exception as e:
-            print(f"Ollama Error: {e}")
+            print(f"[VLM] ❌ Ollama Error ({self.model_name}): {type(e).__name__}: {e}")
+            print(f"[VLM] ❌ Check if OLLAMA_HOST is set correctly for cloud model access")
             return f"Error: {e}"
 
 

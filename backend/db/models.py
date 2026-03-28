@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, ForeignKey, Index
 from datetime import datetime
 from .database import Base
 
@@ -39,3 +39,15 @@ class SystemSetting(Base):
     
     key = Column(String, primary_key=True, index=True)
     value = Column(String)  # Stored as string, can be parsed as JSON if needed
+
+
+class ClipRecord(Base):
+    __tablename__ = "clip_records"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    camera_id    = Column(String, nullable=False, index=True)
+    alert_id     = Column(Integer, ForeignKey("alerts.id"), nullable=True)
+    file_path    = Column(String, nullable=False)
+    duration_sec = Column(Integer, nullable=False)
+    captured_at  = Column(DateTime, nullable=False, default=datetime.utcnow)
+    expires_at   = Column(DateTime, nullable=False, index=True)

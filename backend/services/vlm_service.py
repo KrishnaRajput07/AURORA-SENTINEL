@@ -122,17 +122,23 @@ class VLMService:
                 numeric_risk = 40
 
         if not prompt:
-            if "causal_fall" in risk_str:
-                prompt = (
-                    "EXAMINE: A person is on the ground. Is this an accidental slip/fall, "
-                    "or did the other person push/shove them? Analyze the interaction logic."
-                )
-            elif numeric_risk >= 85:
-                prompt = "CRITICAL: Describe the violence/weapon. Differentiate sport from real threat."
-            elif numeric_risk >= 40:
-                prompt = "AUDIT: Analyze behavior. Is this a threat, prank, or organized sport?"
-            else:
-                prompt = "SANITY CHECK: Verify if this scene is safe. Look for hidden threats."
+            # Use enhanced contextual prompts
+            try:
+                from backend.services.enhanced_vlm_prompts import build_contextual_prompts
+                prompt = build_contextual_prompts(numeric_risk, risk_str)
+            except ImportError:
+                # Fallback to original prompts
+                if "causal_fall" in risk_str:
+                    prompt = (
+                        "EXAMINE: A person is on the ground. Is this an accidental slip/fall, "
+                        "or did the other person push/shove them? Analyze the interaction logic."
+                    )
+                elif numeric_risk >= 85:
+                    prompt = "CRITICAL: Describe the violence/weapon. Differentiate sport from real threat."
+                elif numeric_risk >= 40:
+                    prompt = "AUDIT: Analyze behavior. Is this a threat, prank, or organized sport?"
+                else:
+                    prompt = "SANITY CHECK: Verify if this scene is safe. Look for hidden threats."
 
         providers = [
             ("ollama", self.ollama.analyze),
@@ -141,6 +147,7 @@ class VLMService:
 
         for provider_name, fn in providers:
             if fn is None:
+                print(f"[VLM] ⚠️ {provider_name} provider is None (not configured), skipping...")
                 continue
             try:
                 print(f"[VLM] Trying {provider_name}...")
@@ -165,11 +172,19 @@ class VLMService:
                     if nemotron_verification:
                         payload["nemotron_verification"] = nemotron_verification
                     return payload
+                else:
+                    # EXPLICIT FALLBACK LOGGING
+                    print(f"[VLM] ❌ {provider_name} returned error: {result}")
+                    print(f"[VLM] ⚠️ FALLBACK: Switching to next provider...")
             except Exception as e:
-                print(f"[VLM] {provider_name} failed: {e}")
+                print(f"[VLM] ❌ {provider_name} failed with exception: {e}")
+                print(f"[VLM] ⚠️ FALLBACK: Switching to next provider...")
 
         latency = time.time() - start
         self.provider_name = "none"
+        # ALL PROVIDERS FAILED - EXPLICIT LOG
+        print(f"[VLM] 🚨 ALL PROVIDERS FAILED! Falling back to ML-only analysis.")
+        print(f"[VLM] 🚨 This means Ollama cloud model may not be reachable. Check your OLLAMA_HOST or API key.")
         return {
             "provider": "none",
             "description": "No VLM providers available. ML-only analysis active.",
@@ -330,10 +345,22 @@ class VLMService:
             "confidence": float(response.get("confidence", 0.5)),
         }
 
+    @staticmethod
+    def _is_negated(text, keyword, window=6):
+        """Return True if `keyword` is preceded by a negation word within `window` words."""
+        negations = {'not', 'no', 'never', 'without', "isn't", "aren't", "doesn't",
+                     "don't", "neither", "nor", 'non', 'nothing', 'nobody'}
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        for m in re.finditer(pattern, text):
+            preceding = text[:m.start()].split()[-window:]
+            if any(neg in preceding for neg in negations):
+                return True
+        return False
+
     def _extract_risk_from_text(self, description, base_risk):
         """
         Extract a risk score from VLM description text using keyword analysis.
-        Applies sport/boxing safety cap when appropriate.
+        Applies negation awareness and sport/boxing safety cap.
         """
         lower_desc = (description or "").lower()
 
@@ -358,13 +385,22 @@ class VLMService:
         risk = float(base_risk)
         for keyword, score in threat_keywords.items():
             if re.search(r"\b" + re.escape(keyword) + r"\b", lower_desc):
-                risk = max(risk, score)
+                if not self._is_negated(lower_desc, keyword):
+                    risk = max(risk, score)
 
+        # Sport/prank override — only if NOT negated
         sport_indicators = ["boxing", "sparring", "referee", "boxing ring", "boxing gloves"]
         danger_indicators = ["street fight", "unauthorized", "assault", "ambush"]
-        if any(s in lower_desc for s in sport_indicators):
-            if all(d not in lower_desc for d in danger_indicators):
-                risk = min(risk, SPORT_RISK_CAP)
+        is_sport = any(
+            kw in lower_desc and not self._is_negated(lower_desc, kw)
+            for kw in sport_indicators
+        )
+        is_real_fight = any(
+            kw in lower_desc and not self._is_negated(lower_desc, kw)
+            for kw in danger_indicators
+        )
+        if is_sport and not is_real_fight:
+            risk = min(risk, SPORT_RISK_CAP)
 
         return risk
 

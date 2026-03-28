@@ -37,8 +37,17 @@ def draw_skeleton(frame, kpts, conf):
             cv2.circle(frame, (int(x), int(y)), 3, (0, 0, 255), -1)
 
 async def process_video_file_task(video_path: str, context_params: dict = None):
-    if not ml_service.detector:
-        return {"error": "Models not loaded", "alerts": [], "processed_url": "", "metrics": {}}
+    # Wait up to 60s for models to finish loading
+    if not ml_service.loaded:
+        print("[VideoProcess] Models not ready, waiting up to 60s...")
+        import asyncio
+        for _ in range(30):
+            await asyncio.sleep(2)
+            if ml_service.loaded:
+                break
+        if not ml_service.loaded:
+            print("[VideoProcess] ERROR: Models failed to load after 60s")
+            return {"error": "Models not loaded", "alerts": [], "processed_url": "", "metrics": {}}
 
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
@@ -49,34 +58,22 @@ async def process_video_file_task(video_path: str, context_params: dict = None):
     
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
-    base_name = os.path.basename(video_path)
-    name_without_ext = os.path.splitext(base_name)[0]
-    out_name = f"proc_{name_without_ext}.mp4"
+    out_name = f"proc_{os.path.basename(video_path)}"
     out_dir = os.path.abspath(os.getenv("PROCESSED_PATH", "storage/processed"))
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, out_name)
-    # Windows often fails H.264 (avc1) without an OpenH264 DLL.
-    # Use mp4v for capture, then optionally transcode to H.264 via ffmpeg if available.
-    # Prioritize browser-compatible codecs (H.264 / AVC1)
-    fourcc = None
-    if os.name == 'nt':
-        for cc in ['avc1', 'H264', 'mp4v']:
-            fourcc_test = cv2.VideoWriter_fourcc(*cc)
-            out = cv2.VideoWriter(out_path, fourcc_test, fps, (w, h))
-            if out.isOpened():
-                print(f"DEBUG: Using fourcc {cc}")
-                fourcc = fourcc_test
-                break
-        if not fourcc:
-            print("CRITICAL: Failed to find H.264 (avc1) or mp4v. Video will not be playable in browser.")
-    else:
-        fourcc = cv2.VideoWriter_fourcc(*'H264')
-        out = cv2.VideoWriter(out_path, fourcc, fps, (w, h))
+
+    # Always write frames to a temporary mp4v file first (OpenCV-compatible on all platforms).
+    # Then transcode to H.264 + faststart via ffmpeg for browser compatibility.
+    # mp4v is NOT playable in browsers; H.264 in an MP4 container is required.
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False, dir=out_dir) as _tmp:
+        tmp_raw_path = _tmp.name
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(tmp_raw_path, fourcc, fps, (w, h))
 
     if not out or not out.isOpened():
-        print(f"Warning: Failed to open VideoWriter with prioritized codecs. Falling back to mp4v.")
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(out_path, fourcc, fps, (w, h))
+        print("CRITICAL: Failed to open VideoWriter with mp4v. Output will be unavailable.")
     
     frame_count, alerts, max_p = 0, [], 0
     motion_patterns_set = set()  # Track unique patterns
@@ -194,34 +191,49 @@ async def process_video_file_task(video_path: str, context_params: dict = None):
         out.release()
         db.close()
 
-    # Optional: transcode to H.264 for browser compatibility (best-effort).
-    # mp4v is widely writable but not always playable in all browsers.
+    # Transcode the raw mp4v temp file → H.264 + faststart (required for browser playback).
+    # mp4v encoded files play on desktop players but show blank in all browsers.
     try:
         ffmpeg = shutil.which("ffmpeg")
-        # Fallback for WinGet installation
+        # Fallback for WinGet installation path
         if not ffmpeg:
             winget_path = r"C:\Users\HP\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe"
             if os.path.exists(winget_path):
                 ffmpeg = winget_path
-                
+
         if ffmpeg:
-            tmp_out = out_path.replace(".mp4", ".h264.mp4")
             cmd = [
                 ffmpeg, "-y",
-                "-i", out_path,
+                "-i", tmp_raw_path,
                 "-c:v", "libx264",
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
-                tmp_out
+                "-preset", "ultrafast",
+                out_path
             ]
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            if proc.returncode == 0 and os.path.exists(tmp_out) and os.path.getsize(tmp_out) > 1000:
-                os.replace(tmp_out, out_path)
+            if proc.returncode == 0 and os.path.exists(out_path) and os.path.getsize(out_path) > 1000:
+                print(f"SUCCESS: Transcoded to H.264 browser-compatible video: {out_path}")
             else:
-                if os.path.exists(tmp_out):
-                    os.remove(tmp_out)
+                # Transcode failed — copy raw mp4v as fallback so file still exists,
+                # but log a warning that it won't play in browsers.
+                print(f"WARNING: ffmpeg transcode failed (exit {proc.returncode}). "
+                      f"Video saved as mp4v — will NOT play in browsers.\nffmpeg stderr: {proc.stderr[-500:]}")
+                shutil.copy2(tmp_raw_path, out_path)
+        else:
+            # ffmpeg not found — copy raw file and warn loudly
+            print("WARNING: ffmpeg not found. Video saved as mp4v — will NOT play in browsers. "
+                  "Install ffmpeg to enable H.264 encoding.")
+            shutil.copy2(tmp_raw_path, out_path)
     except Exception as e:
-        print(f"Warning: ffmpeg transcode skipped/failed: {e}")
+        print(f"WARNING: ffmpeg transcode error: {e}. Copying raw mp4v file as fallback.")
+        shutil.copy2(tmp_raw_path, out_path)
+    finally:
+        # Always clean up the raw temp file
+        try:
+            os.unlink(tmp_raw_path)
+        except OSError:
+            pass
     
     # 1.5 Alert Deduplication (Innovation #27)
     deduped_alerts = []
@@ -276,9 +288,10 @@ async def process_video_file_task(video_path: str, context_params: dict = None):
             top_factors = peak_alert.get('top_factors', [])
             
             # Innovation #33: Struct-Before-ML (Priority VQA)
-            if vlm_service.chartqa.available:
+            chartqa = getattr(vlm_service, 'chartqa', None)
+            if chartqa and getattr(chartqa, 'available', False):
                 print(f"  [CORTEX STRUCT] Running ChartQA on peak frame...")
-                struct_res = vlm_service.chartqa.analyze(pil_img, "What is the primary activity in this security footage?")
+                struct_res = chartqa.analyze(pil_img, "What is the primary activity in this security footage?")
                 if struct_res and "Error" not in struct_res:
                     vlm_forensic_description = f"STRUCTURAL ANALYST: {struct_res}. "
             
@@ -399,12 +412,6 @@ async def process_video(
                 "id": f"vid_{int(datetime.now().timestamp())}_{safe_filename[:10]}",
                 "filename": file.filename,
                 "processed_at": datetime.now().isoformat(),
-                "video_summary": {
-                    "text": results.get("description", "No detailed description available."),
-                    "provider": results.get("metrics", {}).get("ai_provider", "ensemble"),
-                    "confidence": min(1.0, max(0.0, (results.get("metrics", {}).get("fight_probability", 0) or 0) / 100.0)),
-                    "generated_at": datetime.now().isoformat()
-                },
                 "events": [
                     {
                         "timestamp": 0.0, # Brief summary at start of clip

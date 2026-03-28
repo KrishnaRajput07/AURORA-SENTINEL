@@ -115,7 +115,7 @@ const Layout = ({ children }) => {
                                                 </Box>
                                                 <Box sx={{ flexGrow: 1 }} onClick={handleNotifClose}>
                                                     <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{n.title}</Typography>
-                                                    <Typography variant="caption" color="text.secondary">{n.level} • {format(new Date(n.time), 'HH:mm')}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">{n.level} • {n.time ? format(new Date(n.time), 'HH:mm') : ''}</Typography>
                                                 </Box>
                                                 <IconButton size="small" onClick={(e) => { e.stopPropagation(); removeNotification(n.id); }}>
                                                     <LogOut size={14} style={{ transform: 'rotate(90deg)' }} /> {/* Using LogOut since Trash isn't imported, or I'll check imports */}

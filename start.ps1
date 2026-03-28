@@ -1,87 +1,110 @@
-# Aurora Sentinel Startup Script
-Set-Location "$PSScriptRoot"
+# AURORA Sentinel - One-command startup
+# Usage: .\start.ps1
 
-Write-Host "Starting Aurora Sentinel..." -ForegroundColor Cyan
+$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Function to start a process in a new window
-function Start-Component {
-    param (
-        [string]$Title,
-        [string]$Command,
-        [string]$Path
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  AURORA Sentinel - Starting All Services" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Helper: write a temp .ps1 and open it in a new window
+function Start-Window {
+    param([string]$Title, [string]$WorkDir, [string[]]$Lines)
+    $tmp = [System.IO.Path]::GetTempFileName() + ".ps1"
+    $Lines | Set-Content -Path $tmp -Encoding UTF8
+    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-File", $tmp
+    Write-Host "  [OK] $Title" -ForegroundColor Green
+}
+
+# ── 1. AI Intelligence Layer ──────────────────────────────────────────────────
+Write-Host "Starting AI Intelligence Layer..." -ForegroundColor Yellow
+$aiDir = Join-Path $Root "ai-intelligence-layer"
+
+if (Test-Path (Join-Path $aiDir "venv_ai\Scripts\Activate.ps1")) {
+    Start-Window -Title "AI Layer" -WorkDir $aiDir -Lines @(
+        "Set-Location '$aiDir'",
+        "& '.\venv_ai\Scripts\Activate.ps1'",
+        "python server_local.py"
     )
-    Write-Host "Starting $Title..." -ForegroundColor Green
-    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", "cd '$Path'; $Command"
-}
-
-# 1. Start AI Intelligence Layer (Python-based with local models)
-$provider = if ($env:PRIMARY_VLM_PROVIDER) { $env:PRIMARY_VLM_PROVIDER } else { "ollama_cloud" }
-if ($provider -eq "ollama_cloud") {
-    Write-Host "Starting AI Intelligence Layer (Ollama Cloud primary, local Qwen2 fallback)..." -ForegroundColor Yellow
+} elseif (Test-Path (Join-Path $Root "venv\Scripts\Activate.ps1")) {
+    Start-Window -Title "AI Layer" -WorkDir $aiDir -Lines @(
+        "Set-Location '$aiDir'",
+        "& '..\venv\Scripts\Activate.ps1'",
+        "python server_local.py"
+    )
+} elseif (Test-Path (Join-Path $aiDir "node_modules")) {
+    Start-Window -Title "AI Layer (Node)" -WorkDir $aiDir -Lines @(
+        "Set-Location '$aiDir'",
+        "npm start"
+    )
 } else {
-    Write-Host "Starting AI Intelligence Layer (Local Qwen2 primary)..." -ForegroundColor Yellow
+    Write-Host "  [SKIP] AI layer not set up - run setup first" -ForegroundColor DarkYellow
 }
 
-if (Test-Path ".\ai-intelligence-layer\venv_ai") {
-    # Use Python-based AI layer with local models
-    Start-Component -Title "AI Intelligence Layer (Local)" -Command ".\venv_ai\Scripts\Activate.ps1; python server_local.py" -Path "$PSScriptRoot\ai-intelligence-layer"
-} elseif (Test-Path "$PSScriptRoot\venv") {
-    # Use root venv which has AI layer dependencies installed
-    Start-Component -Title "AI Intelligence Layer (Local)" -Command "..\venv\Scripts\Activate.ps1; python server_local.py" -Path "$PSScriptRoot\ai-intelligence-layer"
-} elseif (Test-Path "$PSScriptRoot\ai-intelligence-layer\node_modules") {
-    # Fallback to Node.js version if available
-    Start-Component -Title "AI Intelligence Layer (Node)" -Command "npm start" -Path ".\ai-intelligence-layer"
-} else {
-    Write-Host "AI Intelligence Layer not set up. Run setup_ai_local.ps1 first" -ForegroundColor Yellow
-    Write-Host "Or install Node.js dependencies: cd ai-intelligence-layer; npm install" -ForegroundColor Yellow
-}
-
-# Wait for AI layer to start
-Write-Host "Waiting for AI Intelligence Layer to initialize..." -ForegroundColor Yellow
+Write-Host "  Waiting 5s for AI layer..." -ForegroundColor DarkGray
 Start-Sleep -Seconds 5
 
-# 2. Start Backend
-Start-Component -Title "Backend API" -Command "`$env:PYTHONPATH='.'; .\venv\Scripts\python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload" -Path "."
+# ── 2. Backend API ────────────────────────────────────────────────────────────
+Write-Host "Starting Backend API..." -ForegroundColor Yellow
 
-# Wait for backend to start and load AI models
-Write-Host "Waiting for Backend to initialize and load AI models into GPU (this may take 15-30 seconds)..." -ForegroundColor Yellow
-$apiReady = $false
-$retryCount = 0
-while (-not $apiReady -and $retryCount -lt 30) {
+$venvPy = ""
+if (Test-Path (Join-Path $Root "venv\Scripts\python.exe")) {
+    $venvPy = Join-Path $Root "venv\Scripts\python.exe"
+} elseif (Test-Path (Join-Path $Root ".venv\Scripts\python.exe")) {
+    $venvPy = Join-Path $Root ".venv\Scripts\python.exe"
+} else {
+    $venvPy = "python"
+}
+
+Start-Window -Title "Backend API" -WorkDir $Root -Lines @(
+    "Set-Location '$Root'",
+    "`$env:PYTHONPATH = '$Root'",
+    "& '$venvPy' -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload"
+)
+
+# Wait for backend health
+Write-Host "  Waiting for backend health check..." -ForegroundColor DarkGray
+$ready = $false
+for ($i = 0; $i -lt 30; $i++) {
+    Start-Sleep -Seconds 2
     try {
-        $response = Invoke-WebRequest -Uri "http://localhost:8000/health" -Method Get -ErrorAction Stop
-        if ($response.StatusCode -eq 200) {
-            $apiReady = $true
-            Write-Host "Backend API is ready!" -ForegroundColor Green
-        }
-    } catch {
-        Write-Host -NoNewline "."
-        Start-Sleep -Seconds 2
-        $retryCount++
-    }
+        $r = Invoke-WebRequest -Uri "http://localhost:8000/health" -TimeoutSec 2 -ErrorAction Stop
+        if ($r.StatusCode -eq 200) { $ready = $true; break }
+    } catch {}
+    Write-Host -NoNewline "."
 }
 Write-Host ""
-if (-not $apiReady) {
-    Write-Host "Warning: Backend initialization took longer than expected. Proceeding anyway..." -ForegroundColor Red
+if ($ready) {
+    Write-Host "  [OK] Backend ready!" -ForegroundColor Green
+} else {
+    Write-Host "  [WARN] Backend slow to start - check its window" -ForegroundColor DarkYellow
 }
-# 3. Start Frontend
-# Check if node_modules exists, if not install
-if (-not (Test-Path ".\frontend\node_modules")) {
-    Write-Host "Installing Frontend Dependencies..." -ForegroundColor Yellow
-    cd ".\frontend"
+
+# ── 3. Frontend ───────────────────────────────────────────────────────────────
+Write-Host "Starting Frontend..." -ForegroundColor Yellow
+$feDir = Join-Path $Root "frontend"
+
+if (-not (Test-Path (Join-Path $feDir "node_modules"))) {
+    Write-Host "  Installing frontend deps (first run)..." -ForegroundColor DarkYellow
+    Push-Location $feDir
     npm install
-    cd ..
+    Pop-Location
 }
 
-Start-Component -Title "Frontend Dashboard" -Command "npm start" -Path ".\frontend"
+Start-Window -Title "Frontend" -WorkDir $feDir -Lines @(
+    "Set-Location '$feDir'",
+    "npm start"
+)
 
-Write-Host "System Starting!" -ForegroundColor Cyan
-Write-Host "AI Intelligence Layer: http://localhost:3001 (Provider Router)" -ForegroundColor White
-Write-Host "Backend API: http://localhost:8000/docs" -ForegroundColor White
-Write-Host "Frontend Dashboard: http://localhost:3000" -ForegroundColor White
+# ── Summary ───────────────────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "IMPORTANT: Wait for all services to fully initialize before using the system" -ForegroundColor Yellow
-Write-Host "Check each window for startup complete messages" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  All services launched!" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Note: Local fallback models are lazy-loaded on first fallback use" -ForegroundColor Cyan
-Write-Host "If PRIMARY_VLM_PROVIDER=ollama_cloud, Qwen2 is not preloaded at startup" -ForegroundColor Cyan
+Write-Host "  Frontend:    http://localhost:3000" -ForegroundColor White
+Write-Host "  Backend:     http://localhost:8000/docs" -ForegroundColor White
+Write-Host "  AI Layer:    http://localhost:3001/health" -ForegroundColor White
+Write-Host ""

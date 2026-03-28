@@ -39,12 +39,15 @@ class MLService:
         if self.loaded:
             self.models_ready.set()
             return
+        # Load synchronously — must complete before accepting WebSocket connections
+        self._load_models_internal()
 
-        # New load attempt: clear previous status.
+    def load_models_async(self):
+        """Non-blocking load for cases where background loading is acceptable."""
+        if self.loaded:
+            return
         self.load_error = None
         self.models_ready.clear()
-        
-        # Run loading in a background thread to prevent blocking the FastAPI startup
         thread = threading.Thread(target=self._load_models_internal)
         thread.daemon = True
         thread.start()
@@ -54,38 +57,49 @@ class MLService:
         return self.models_ready.wait(timeout=timeout)
 
     def _load_models_internal(self):
-        print("Loading ML Models (Background Thread)...")
+        print("=" * 50)
+        print("Loading ML Models...")
         try:
             if UnifiedDetector:
                 import torch
                 preferred_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+                print(f"  Device: {preferred_device.upper()}")
 
                 try:
+                    print("  Loading YOLO detector...")
                     self.detector = UnifiedDetector(device=preferred_device)
                     self.device_in_use = preferred_device
                 except Exception as gpu_exc:
                     # If GPU init fails (OOM/driver), fall back to CPU.
                     if preferred_device == 'cuda':
-                        print(f"Warning: CUDA detector init failed, falling back to CPU. Error: {gpu_exc}")
+                        print(f"  Warning: CUDA detector init failed, falling back to CPU. Error: {gpu_exc}")
                         self.detector = UnifiedDetector(device='cpu')
                         self.device_in_use = 'cpu'
                     else:
                         raise
 
+                print("  Warming up models...")
                 self.detector.warmup()
+                print("  Loading Risk Engine...")
                 self.risk_engine = RiskScoringEngine()
+                print("  Loading Anonymizer...")
                 self.anonymizer = PrivacyAnonymizer()
                 self.loaded = True
                 self.load_error = None
                 self.models_ready.set()
-                print(f"ML Models loaded successfully in background (device={self.device_in_use}).")
+                print(f"ML Models loaded successfully (device={self.device_in_use}).")
+                print("=" * 50)
             else:
-                print("ML dependencies missing, running in mock mode.")
+                print("WARNING: ML dependencies missing — running in mock mode (0% scores expected).")
+                print("Install: pip install ultralytics torch")
                 self.loaded = False
                 self.load_error = "ML dependencies missing (UnifiedDetector import failed)"
                 self.models_ready.set()
+                print("=" * 50)
         except Exception as e:
-            print(f"Error loading ML models: {e}")
+            import traceback
+            print(f"ERROR loading ML models: {e}")
+            traceback.print_exc()
             self.detector = None
             self.risk_engine = None
             self.anonymizer = None
@@ -93,5 +107,6 @@ class MLService:
             self.device_in_use = None
             self.load_error = str(e)
             self.models_ready.set()  # Unblock waiters even on failure
+            print("=" * 50)
 
 ml_service = MLService.get_instance()

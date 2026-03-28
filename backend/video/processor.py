@@ -1,5 +1,9 @@
 import cv2
 import numpy as np
+import os
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -99,7 +103,49 @@ class VideoProcessor:
         
         cap.release()
         out.release()
-        
+
+        # Transcode mp4v → H.264 + faststart for browser compatibility.
+        # mp4v plays on desktop but shows blank in all browsers.
+        try:
+            ffmpeg = shutil.which("ffmpeg")
+            if not ffmpeg:
+                winget_path = (
+                    r"C:\Users\HP\AppData\Local\Microsoft\WinGet\Packages"
+                    r"\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe"
+                    r"\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe"
+                )
+                if os.path.exists(winget_path):
+                    ffmpeg = winget_path
+
+            if ffmpeg:
+                tmp_h264 = str(output_path).replace(".mp4", "._h264_tmp.mp4")
+                cmd = [
+                    ffmpeg, "-y",
+                    "-i", str(output_path),
+                    "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    "-movflags", "+faststart",
+                    "-preset", "ultrafast",
+                    tmp_h264,
+                ]
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if proc.returncode == 0 and os.path.exists(tmp_h264) and os.path.getsize(tmp_h264) > 1000:
+                    os.replace(tmp_h264, str(output_path))
+                    logger.info(f"Summary transcoded to H.264: {output_path}")
+                else:
+                    logger.warning(
+                        f"ffmpeg transcode failed for summary clip (exit {proc.returncode}). "
+                        f"File will NOT play in browsers. stderr: {proc.stderr[-300:]}"
+                    )
+                    if os.path.exists(tmp_h264):
+                        os.remove(tmp_h264)
+            else:
+                logger.warning(
+                    "ffmpeg not found — summary clip saved as mp4v and will NOT play in browsers."
+                )
+        except Exception as e:
+            logger.warning(f"ffmpeg transcode error for summary: {e}")
+
         logger.info(f"Summary created: {output_path}")
         return str(output_path)
     

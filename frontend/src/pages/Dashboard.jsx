@@ -80,16 +80,16 @@ const Dashboard = () => {
                             colSpan: { xs: 'span 1', md: 'span 2' },
                             content: (
                                 <Paper sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', pointerEvents: 'auto' }}>
-                                    <Box sx={{ py: 2, px: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                            <Box sx={{ p: 1, bgcolor: '#F0FDF4', borderRadius: '50%' }}>
-                                                <Activity size={20} color={theme.palette.primary.main} />
+                                    <Box sx={{ py: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <Box sx={{ p: 1.5, bgcolor: '#F0FDF4', borderRadius: '50%' }}>
+                                                <Activity size={28} color={theme.palette.primary.main} />
                                             </Box>
-                                            <Typography variant="h6" sx={{ fontSize: '1rem', color: theme.palette.text.primary, fontWeight: 700 }}>
+                                            <Typography variant="h6" sx={{ fontSize: '1.2rem', color: theme.palette.text.primary, fontWeight: 700 }}>
                                                 Live Activity Map
                                             </Typography>
                                         </Box>
-                                        <Chip label="Active" size="small" color="success" sx={{ height: 24, fontSize: '0.75rem' }} />
+                                        <Chip label="Active" size="small" color="success" sx={{ height: 32, fontSize: '0.9rem' }} />
                                     </Box>
                                     <Box sx={{ flexGrow: 1, position: 'relative' }}>
                                         <RiskHeatmap alerts={alerts} />

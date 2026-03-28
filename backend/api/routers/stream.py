@@ -1,23 +1,15 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.services.ml_service import ml_service
 from backend.services.video_storage_service import video_storage_service
+from backend.services.clip_capture_service import clip_capture_service
 from backend.db.database import SessionLocal
-from backend.db.models import Alert
+from backend.db.models import Alert, SystemSetting
 import cv2
 import numpy as np
 import asyncio
 import base64
 from datetime import datetime
 import time
-import sys
-import os
-
-# Load config
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-try:
-    import config
-except ImportError:
-    config = None
 
 router = APIRouter()
 
@@ -53,12 +45,11 @@ async def websocket_live_feed(websocket: WebSocket):
     print("WebSocket connected (Robust)")
     
     frame_count = 0
-    SKIP_FRAMES = 1
-    session_started_recording = False
+    SKIP_FRAMES = 1 # Process 1 out of every 2 frames (Increased from 1/3)
     
     # State for deduping alerts (prevent spamming DB)
     last_alert_time = 0
-    ALERT_COOLDOWN = getattr(config, 'ALERT_COOLDOWN_SECONDS', 10) if config else 10
+    ALERT_COOLDOWN = 10 # Seconds between persistent alerts
     
     cached_result = {
         "detection": {"poses": [], "objects": []}, 
@@ -77,18 +68,8 @@ async def websocket_live_feed(websocket: WebSocket):
                 break # Client disconnected
 
             if not ml_service.detector:
-                if ml_service.load_error:
-                    await websocket.send_json({"error": f"Model load failed: {ml_service.load_error}"})
-                else:
-                    await websocket.send_json({"error": "Models Loading..."})
+                await websocket.send_json({"error": "Models Loading..."})
                 await asyncio.sleep(0.5) # Reduced backoff
-                continue
-            
-            # If detector exists but scoring engine is unavailable, avoid crashing the websocket loop.
-            if not ml_service.risk_engine:
-                err = ml_service.load_error or "Risk engine unavailable"
-                await websocket.send_json({"error": f"Risk engine unavailable: {err}"})
-                await asyncio.sleep(0.5)
                 continue
 
             # Decode frame
@@ -119,25 +100,51 @@ async def websocket_live_feed(websocket: WebSocket):
                     # 3. Calculate Risk
                     risk_score, risk_factors = ml_service.risk_engine.calculate_risk(detection)
                     risk_score = risk_score or 0
+                    print(f"[DEBUG] risk_score={risk_score:.1f}, weapons={len(detection.get('weapons',[]))}, objects={[o['class'] for o in detection.get('objects',[]) if o['class'] in ['knife','scissors','baseball bat']]}")
                         
                     alert = None
-                    _live_alert_th = getattr(config, 'LIVE_ALERT_THRESHOLD', 65) if config else 65
-                    if risk_score > _live_alert_th:
+                    if risk_score > 65: # New threshold from previous task
                         alert = ml_service.risk_engine.generate_alert(risk_score, risk_factors)
                         alert['level'] = alert['level'].upper()
-                        
-                        _recording_th = getattr(config, 'RECORDING_THRESHOLD', 50) if config else 50
-                        if risk_score > _recording_th:
-                            if not video_storage_service.is_recording("CAM-01"):
-                                frame_h, frame_w = frame.shape[:2]
-                                video_storage_service.start_recording("CAM-01", frame_size=(frame_w, frame_h))
-                                session_started_recording = True
+                        print(f"[ClipCapture] Risk={risk_score:.1f} > 65, alert generated")
                         
                         now = datetime.utcnow().timestamp()
                         if alert and (now - last_alert_time > ALERT_COOLDOWN):
                             loop = asyncio.get_event_loop()
-                            await loop.run_in_executor(None, save_alert_sync, alert)
+                            alert_id = await loop.run_in_executor(None, save_alert_sync, alert)
                             last_alert_time = now
+                            print(f"[ClipCapture] Alert saved id={alert_id}, score={risk_score:.1f}")
+
+                            if alert_id is not None:
+                                capture_ts = datetime.utcnow()
+                                async def _delayed_capture(aid, ts, score):
+                                    db = SessionLocal()
+                                    try:
+                                        row = db.query(SystemSetting).filter(
+                                            SystemSetting.key == "clip_duration_seconds"
+                                        ).first()
+                                        total_duration = int(row.value) if row else 10
+                                    except Exception:
+                                        total_duration = 10
+                                    finally:
+                                        db.close()
+                                    post_seconds = max(1, int(total_duration * 0.3))
+                                    await asyncio.sleep(post_seconds)
+                                    result = await clip_capture_service.handle_threshold_crossing(
+                                        camera_id="CAM-01",
+                                        timestamp=ts,
+                                        final_score=float(score),
+                                        alert_id=aid,
+                                    )
+                                    if result:
+                                        print(f"[ClipCapture] Clip saved: id={result.id} path={result.file_path}")
+                                    else:
+                                        print(f"[ClipCapture] Clip capture returned None — check smart_bin_enabled and storage/clips/")
+                                asyncio.create_task(_delayed_capture(alert_id, capture_ts, risk_score))
+
+                    # Start rolling buffer when risk escalates so footage is ready for clip capture
+                    if risk_score > 30:
+                        video_storage_service.start_recording("CAM-01")
 
                     # Always add frame to active recording
                     video_storage_service.add_frame("CAM-01", frame)
@@ -152,12 +159,6 @@ async def websocket_live_feed(websocket: WebSocket):
                     import traceback
                     print(f"ML Processing Failed: {e}")
                     traceback.print_exc()
-                    # Ensure we keep streaming frames even if scoring fails.
-                    detection = cached_result.get("detection", {"poses": [], "objects": []})
-                    risk_score = cached_result.get("risk_score", 0)
-                    risk_factors = cached_result.get("risk_factors", {}) or {}
-                    alert = cached_result.get("alert", None)
-                    faces = cached_result.get("faces", []) or []
             else:
                 detection = cached_result["detection"]
                 risk_score = cached_result["risk_score"]
@@ -238,8 +239,6 @@ async def websocket_live_feed(websocket: WebSocket):
                     active_threats = set()
                     for w in detection.get('weapons', []):
                         active_threats.add(w.get('sub_class', 'weapon'))
-                    for f in detection.get('fire', []):
-                        active_threats.add(f.get('class', 'fire'))
                     for o in detection.get('objects', []):
                         cls = o.get('class', '')
                         if cls in ['knife', 'baseball bat', 'scissors', 'gun', 'fire']:
@@ -253,7 +252,6 @@ async def websocket_live_feed(websocket: WebSocket):
                             "person_count": len(detection.get('poses', [])),
                             "object_count": len(detection.get('objects', [])),
                             "weapon_count": len(detection.get('weapons', [])),
-                            "fire_count": len(detection.get('fire', [])),
                             "active_threats": list(active_threats)
                         }
                     })
@@ -267,8 +265,6 @@ async def websocket_live_feed(websocket: WebSocket):
     except Exception as e:
         print(f"WebSocket Loop Error: {e}")
     finally:
-        if session_started_recording:
-            video_storage_service.stop_recording("CAM-01")
         try:
             await websocket.close()
         except:
