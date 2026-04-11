@@ -1821,8 +1821,30 @@ iit/
 ├── test_integrated_system.py    # Integration tests
 ├── requirements/             # Python dependencies
 ├── .env                         # Environment variables
-└── README.md                    # This file
+│   └── README.md                    # This file
 ```
+
+---
+
+## 📚 Documentation Structure
+
+Each directory contains a `functionality.md` file documenting its components:
+
+| Directory | Documentation |
+|-----------|--------------|
+| Root | [`functionality.md`](functionality.md) — System overview |
+| `backend/` | [`backend/functionality.md`](backend/functionality.md) — FastAPI services |
+| `backend/api/routers/` | [`backend/api/routers/functionality.md`](backend/api/routers/functionality.md) — API endpoints |
+| `backend/services/` | [`backend/services/functionality.md`](backend/services/functionality.md) — Business logic |
+| `backend/db/` | [`backend/db/functionality.md`](backend/db/functionality.md) — Database models |
+| `frontend/` | [`frontend/functionality.md`](frontend/functionality.md) — React application |
+| `frontend/src/components/` | [`frontend/src/components/functionality.md`](frontend/src/components/functionality.md) — UI components |
+| `models/` | [`models/functionality.md`](models/functionality.md) — ML models |
+| `ai-intelligence-layer/` | [`ai-intelligence-layer/functionality.md`](ai-intelligence-layer/functionality.md) — AI orchestration |
+| `tests/` | [`tests/functionality.md`](tests/functionality.md) — Test suites |
+| `scripts/` | [`scripts/functionality.md`](scripts/functionality.md) — Utilities |
+
+**Architecture Review**: See [`AURORA_SENTINALS_ARCHITECTURE_REVIEW.md`](AURORA_SENTINALS_ARCHITECTURE_REVIEW.md) for detailed technical architecture.
 
 ---
 
